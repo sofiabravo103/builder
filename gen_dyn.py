@@ -89,10 +89,34 @@ def check_outputfile(arg):
             sys.exit()
 
 def check_exp_parameter(arg):
-    pass
+    if '-' in arg:
+        raise Exception('Error: exponential parameter(s) must be a positive'+\
+                            ' number')
+    try: 
+        f = float(arg)
+    except ValueError:
+        raise Exception('Error: exponential parameter(s) is not a number.')
 
-def check_exp_array(arg):
-    pass
+    if f == 0.0:
+        raise Exception('Error: exponential parameter(s) must be greater than'+\
+                            ' zero.')
+
+
+def check_exp_array(arg,options):
+    exp_array = arg.split('%')
+    dimentions = int([y for x,y in options if x == '-d'][0])
+    if len(exp_array) != dimentions:
+        raise Exception('Error: --exparray has bad format (is the number of '+\
+                            'values in the array equal to the number of '+\
+                            'dimentions?)')
+    for num in exp_array:
+        check_exp_parameter(num)
+
+    opt_list = [x for x,y in options]
+    if '--expparameter' in opt_list:
+        raise Exception('Error: --expparameter and --exparray cannot be '+\
+                            'seleceted together')
+
 
 def check_options(options):
     auto = False
@@ -108,10 +132,10 @@ def check_options(options):
             check_arrivals(arg)
         elif opt == '-o':
             check_outputfile(arg)
-        elif opt == '--expparamneter':
+        elif opt == '--expparameter':
             check_exp_parameter(arg)
         elif opt == '--exparray':
-            check_exp_array(arg)
+            check_exp_array(arg,options)
         elif opt == '--autodataset' or opt == '--autotiny':
             if len(options) >= 3:
                 if not (len(options) == 3 and '-v' in opt_list):
@@ -157,7 +181,7 @@ def parse_exponential_options(options):
     for opt, arg in options: 
       if opt == '--expparameter':
           G_EXP_PARAMETER = float(arg)
-      elif opt == '--expparray':
+      elif opt == '--exparray':
           G_EXP_PARAMETER = None
           G_EXP_ARRAY = [float(x) for x in arg.split('%')]
       elif opt == '--rarrival':
