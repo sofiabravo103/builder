@@ -1,6 +1,8 @@
 #!/usr/bin/python
 
-import os, sys, getopt, random, logging
+import os, sys, getopt, random, logging, time
+TIME = time.time()
+GENERATOR = 'generador.cpp'
 
 help_text = '''Usage:
 gen_dyn [options] -o <outputfile> -s <size> -d <dimentions> -a <arrivals>
@@ -173,7 +175,7 @@ def set_defaults():
 
     global G_RANDOM_ARRIVALS
     G_RANDOM_ARRIVALS = False
-
+        
 def parse_exponential_options(options):
     global G_EXP_PARAMETER
     global G_EXP_ARRAY
@@ -215,6 +217,34 @@ def parse_short_options(options):
           global G_ARRIVALS
           G_ARRIVALS = int(arg)
 
+def set_autodataset_values():
+    global G_DIMENTIONS
+    global G_SIZE
+    global G_ARRIVALS
+
+    if G_TINY:
+        max_dim = 3
+
+        min_size = 10
+        max_size = 20
+
+        min_arr = 3
+        max_arr = 5
+
+    else:
+        max_dim = 5
+
+        min_size = 10000
+        max_size = 100000
+        
+        min_arr = 20
+        max_arr = 50
+
+    G_DIMENTIONS = random.randint(3,max_dim)
+    G_SIZE = random.randint(min_size,max_size)
+    G_ARRIVALS = random.randint(min_arr,max_arr)
+
+
 def parse_auto(options):
     global G_AUTO
     global G_TINY
@@ -224,16 +254,20 @@ def parse_auto(options):
         if opt == '--autodataset':
             G_AUTO = True
             G_TINY = False
+            set_autodataset_values()
         elif opt == '--autotiny':
             G_AUTO = True
             G_TINY = True
-
+            set_autodataset_values()
     return G_AUTO
 
 def parse_input(options):
     global G_VERBOSE
     global OUTPUTFILE
     G_VERBOSE = False
+
+    set_defaults()
+
     for opt, arg in options:
         if opt == '-v':            
             G_VERBOSE = True
@@ -241,10 +275,10 @@ def parse_input(options):
             G_OUTPUTFILE = open(arg,'w')
         
     if not parse_auto(options):
-        set_defaults()
         parse_short_options(options)
         parse_datadist_options(options)
         parse_exponential_options(options)
+
 
 def report_input():
     print 'Generating dataset according to:'        
@@ -253,7 +287,24 @@ def report_input():
             value = eval(variable)
             print variable[2:], ":\t", value
 
+def call_kossman():
+    if not os.path.isfile(GENERATOR):
+        raise Exception('Error: kossman generator does exist')
 
+    if not os.path.isfile('generador'):
+        os.system('g++ {0} -o generator'.format(GENERATOR))
+
+    if G_DATA_DIST_APPLICATION == 'dimentions':
+        kossman_columns = G_ARRIVALS * G_DIMENTIONS
+        os.system('./generator {0} {1} {2} tmp_{3} > /dev/null'\
+                      .format(kossman_columns, G_DATA_DIST, G_SIZE,TIME))
+
+    else:
+        kossman_columns = G_ARRIVALS
+        for i in range(0,G_DIMENTIONS - 1):
+            os.system('./generator {0} {1} {2} tmp_{3}_{4} > /dev/null'\
+                          .format(kossman_columns, G_DATA_DIST, G_SIZE,TIME,i))
+            
 def main(argv):
     options= get_options(argv)
     check_options(options)
@@ -262,6 +313,7 @@ def main(argv):
     if G_VERBOSE:
         report_input()
 
+    call_kossman()
 
 
 if __name__ == "__main__":
