@@ -5,18 +5,30 @@ TIME = time.time()
 GENERATOR = 'generador.cpp'
 
 help_text = '''Usage:
-gen_dyn [options] -o <outputfile> -s <size> -d <dimentions> -a <arrivals>
+gen_dyn [options] -o <outputfile> -s <size> -d <dimentions> 
 gen_dyn  -o <outputfile> --autodataset
 gen_dyn  -o <outputfile> --autotiny
 
 Options:
+ --arrivals <num>       sepcify how many arrivals per tuple will be generated
+                        by default poisson distribution is used  
+
+ --poissparameter <num> poisson parameter to use when generating arrival events.
+                        The parameter specifies average arrival events per minute
+                        (defaut is a random number between 1 and 10)
+
+  --poissarray <string> specify a string containg poisson parameters separated
+                        with an '%' (used when different poisson parameters 
+                        will be used to generate arrival events) 
+                        example: --poissarray 5%2%10 for 3 dimentions.
+
  --expparameter <num>   exponential parameter to use when generating arrival 
                         timestamps (defaut is a random number between 1 and 20)
 
   --exparray <string>   specify a string containg exponential parameters separated
                         with an '%' (used when different exponential parameters 
                         will be used to generate arrival timestamps) 
-                        example --exparray 0.5%2%4 for 3 dimentions.
+                        example: --exparray 0.5%2%4 for 3 dimentions.
 
   -v                    verbose output  
   --autodataset         generate medium to small random parameters for the 
@@ -41,8 +53,9 @@ def get_options(argv):
     try:
         long_options = ['exparray=', 'expparameter=','autodataset', 'autotiny',\
                             'anticorrelated', 'correlated', 'uniform',\
-                            'distributearr', 'distributedim', 'rarrival']
-        options, args = getopt.getopt(argv,"o:s:d:a:v",long_options)
+                            'distributearr', 'distributedim', 'rarrival',\
+                        'poissarray=','poissparameter=','arrivals=']
+        options, args = getopt.getopt(argv,"o:s:d:v",long_options)
         if not options:         
             print help_text
             sys.exit(1)
@@ -119,6 +132,40 @@ def check_exp_array(arg,options):
         raise Exception('Error: --expparameter and --exparray cannot be '+\
                             'seleceted together')
 
+def check_not_arrivals(options):
+    opt_list = [x for x,y in options]
+    if '--arrivals' in opt_list:
+        raise Exception('Error: --arrivals cannot be selected along with '+\
+                        '--poissparameter or --poissarray')
+
+def check_poiss_parameter(arg):
+    if '-' in arg or '.' in arg:
+        raise Exception('Error: poisson parameter(s) must be a positive '+\
+                            'integer number')
+    try: 
+        f = int(arg)
+    except ValueError:
+        raise Exception('Error: poisson parameter(s) is not a number.')
+
+    if f == 0:
+        raise Exception('Error: poisson parameter(s) must be greater than'+\
+                            ' zero.')
+
+
+def check_poiss_array(arg,options):
+    poiss_array = arg.split('%')
+    dimentions = int([y for x,y in options if x == '-d'][0])
+    if len(poiss_array) != dimentions:
+        raise Exception('Error: --poissarray has bad format (is the number of '+\
+                            'values in the array equal to the number of '+\
+                            'dimentions?)')
+    for num in poiss_array:
+        check_poiss_parameter(num)
+
+    opt_list = [x for x,y in options]
+    if '--poissparameter' in opt_list:
+        raise Exception('Error: --poissparameter and --poissarray cannot be '+\
+                            'seleceted together')
 
 def check_options(options):
     auto = False
@@ -130,10 +177,16 @@ def check_options(options):
             check_size(arg)
         elif opt == '-d':
             check_dimentions(arg)
-        elif opt == '-a':
-            check_arrivals(arg)
         elif opt == '-o':
             check_outputfile(arg)
+        elif opt == '--poissparameter':
+            check_poiss_parameter(arg)
+            check_not_arrivals(options)
+        elif opt == '--poissarray':
+            check_poiss_array(arg,options)
+            check_not_arrivals(options)
+        elif opt == '--arrrivals':
+            check_arrivals(arg)
         elif opt == '--expparameter':
             check_exp_parameter(arg)
         elif opt == '--exparray':
@@ -153,39 +206,55 @@ def check_options(options):
         if '-d' not in opt_list:
             raise Exception('Error: unless --autodataset or --autotiny are '+\
                                 'selected dimentions value (-d) must be specified')
-        if '-a' not in opt_list:
-            raise Exception('Error: unless --autodataset or --autotiny are '+\
-                                'selected arrivals value (-d) must be specified')
 
 def set_defaults():
     global G_DATA_DIST_APPLICATION
-    G_DATA_DIST_APPLICATION = 'dimentions'
-        
     global G_DATA_DIST
-    G_DATA_DIST = 'E'
-
-    rand = random.random() * 20
+    global G_POISS_PARAMETER
     global G_EXP_PARAMETER
-    G_EXP_PARAMETER = rand 
-    
     global G_AUTO
     global G_TINY
+    global G_RANDOM_ARRIVALS
+
+    G_DATA_DIST_APPLICATION = 'dimentions'        
+
+    G_DATA_DIST = 'E'
+
+    G_EXP_PARAMETER = random.random() * 20
+    
+    G_POISS_PARAMETER = random.randint(1,10)
+    
     G_AUTO = False
     G_TINY = False
 
-    global G_RANDOM_ARRIVALS
     G_RANDOM_ARRIVALS = False
         
-def parse_exponential_options(options):
+def parse_probability_options(options):
     global G_EXP_PARAMETER
     global G_EXP_ARRAY
+    global G_POISS_PARAMETER
+    global G_POISS_ARRAY
+    global G_ARRIVALS
 
     for opt, arg in options: 
       if opt == '--expparameter':
           G_EXP_PARAMETER = float(arg)
+
       elif opt == '--exparray':
           G_EXP_PARAMETER = None
           G_EXP_ARRAY = [float(x) for x in arg.split('%')]
+
+      elif opt == '--arrivals':  
+          G_ARRIVALS = int(arg)
+          G_POISS_PARAMETER = None
+
+      elif opt == '--poissparameter':
+          G_POISS_PARAMETER = int(arg)
+
+      elif opt == '--poissarray':
+          G_POISS_PARAMETER = None
+          G_POISS_ARRAY = [int(x) for x in arg.split('%')]          
+
       elif opt == '--rarrival':
           global G_RANDOM_ARRIVALS
           G_EXP_PARAMETER = None
@@ -213,23 +282,23 @@ def parse_short_options(options):
       elif opt == '-d':
           global G_DIMENTIONS
           G_DIMENTIONS = int(arg)
-      elif opt == '-a':
-          global G_ARRIVALS
-          G_ARRIVALS = int(arg)
 
 def set_autodataset_values():
     global G_DIMENTIONS
     global G_SIZE
     global G_ARRIVALS
+    global G_POISS_PARAMETER
+
+    G_POISS_PARAMETER = None
 
     if G_TINY:
         max_dim = 3
 
-        min_size = 10
-        max_size = 20
+        min_size = 5
+        max_size = 10
 
         min_arr = 3
-        max_arr = 5
+        max_arr = 4
 
     else:
         max_dim = 5
@@ -277,7 +346,7 @@ def parse_input(options):
     if not parse_auto(options):
         parse_short_options(options)
         parse_datadist_options(options)
-        parse_exponential_options(options)
+        parse_probability_options(options)
 
 
 def report_input():
@@ -313,7 +382,8 @@ def main(argv):
     if G_VERBOSE:
         report_input()
 
-    call_kossman()
+#    call_kossman()
+    
 
 
 if __name__ == "__main__":
