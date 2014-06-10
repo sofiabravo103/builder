@@ -1,2 +1,3 @@
 Dependencies:
-	* python numpy package 
+
+1. python numpy package 
