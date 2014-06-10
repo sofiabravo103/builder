@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os, sys, getopt, random, logging, time, numpy
+from threading import Thread
 TIME = time.time()
 GENERATOR = 'generador.cpp'
 
@@ -10,6 +11,8 @@ gen_dyn  -o <outputfile> --autodataset
 gen_dyn  -o <outputfile> --autotiny
 
 Options:
+ --threads <num>       parallel execution, specify how many threads to produce 
+
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
                         by default poisson distribution is used  
 
@@ -54,7 +57,7 @@ def get_options(argv):
         long_options = ['exparray=', 'expparameter=','autodataset', 'autotiny',\
                             'anticorrelated', 'correlated', 'uniform',\
                             'distributearr', 'distributedim', 'rarrival',\
-                        'poissarray=','poissparameter=','arrivals=']
+                        'poissarray=','poissparameter=','arrivals=','threads=']
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
         if not options:         
             print help_text
@@ -151,7 +154,6 @@ def check_poiss_parameter(arg):
         raise Exception('Error: poisson parameter(s) must be greater than'+\
                             ' zero.')
 
-
 def check_poiss_array(arg,options):
     poiss_array = arg.split('%')
     dimentions = int([y for x,y in options if x == '-d'][0])
@@ -167,6 +169,40 @@ def check_poiss_array(arg,options):
         raise Exception('Error: --poissparameter and --poissarray cannot be '+\
                             'seleceted together')
 
+def check_threads_parameter(arg):
+    if '-' in arg or '.' in arg:
+        raise Exception('Error: threads parameter must be a positive '+\
+                        'integer number')
+    try: 
+        f = int(arg)
+    except ValueError:
+        raise Exception('Error: threads parameter is not a number.')
+        
+    if f == 0:
+        raise Exception('Error: threads parameter must be greater than'+\
+                            ' zero.')
+    if f > 10:
+        raise Exception('Error: threads parameter execeds 10.')
+
+
+def check_auto(options):
+    opt_list = [x for x,y in options]
+    if len(options) >= 2:
+        counter = len(options)                
+
+    if '-v' in opt_list:
+        counter = counter - 1
+                
+    if '--threads' in opt_list:
+        counter = counter - 1
+
+    if counter > 2:
+        raise Exception('Error: options --autodataset or '+\
+                        '--autotiny cannot be selected with '+\
+                        'any other option')
+
+
+
 def check_options(options):
     auto = False
     opt_list = [x for x,y in options]
@@ -179,6 +215,8 @@ def check_options(options):
             check_dimentions(arg)
         elif opt == '-o':
             check_outputfile(arg)
+        elif opt == '--threads':
+            check_threads_parameter(arg)
         elif opt == '--poissparameter':
             check_poiss_parameter(arg)
             check_not_arrivals(options)
@@ -192,11 +230,7 @@ def check_options(options):
         elif opt == '--exparray':
             check_exp_array(arg,options)
         elif opt == '--autodataset' or opt == '--autotiny':
-            if len(options) >= 3:
-                if not (len(options) == 3 and '-v' in opt_list):
-                    raise Exception('Error: options --autodataset or '+\
-                                        '--autotiny cannot be selected with '+\
-                                        'anything else')
+            check_auto(options)
             auto = True
 
     if not auto:
@@ -335,6 +369,7 @@ def parse_auto(options):
 def parse_input(options):
     global G_VERBOSE
     global OUTPUTFILE
+    global G_THREADS
     G_VERBOSE = False
 
     set_defaults()
@@ -344,6 +379,8 @@ def parse_input(options):
             G_VERBOSE = True
         elif opt == '-o':
             G_OUTPUTFILE = open(arg,'w')
+        elif opt == '--threads':
+            G_THREADS = int(arg)
         
     if not parse_auto(options):
         parse_short_options(options)
@@ -357,6 +394,9 @@ def report_input():
         if 'G_' in variable:
             value = eval(variable)
             print variable[2:], ":\t", value
+
+
+
 
 def call_kossman():
     if not os.path.isfile(GENERATOR):
@@ -407,6 +447,8 @@ def generate_arrivals():
 
     G_ARRIVALS = max(max_arr)    
     return arrivals
+
+
         
 
 def main(argv):
