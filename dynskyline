@@ -1,7 +1,9 @@
 #!/usr/bin/python
 
-import os, sys, getopt, random, logging, time, numpy
-from threading import Thread
+import os, sys, getopt, random, logging, time, numpy, math
+from multiprocessing import Process
+
+
 TIME = time.time()
 GENERATOR = 'generador.cpp'
 
@@ -11,7 +13,7 @@ gen_dyn  -o <outputfile> --autodataset
 gen_dyn  -o <outputfile> --autotiny
 
 Options:
- --threads <num>       parallel execution, specify how many threads to produce 
+ --threads <num>        parallel execution, specify how many threads to produce 
 
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
                         by default poisson distribution is used  
@@ -250,6 +252,7 @@ def set_defaults():
     global G_AUTO
     global G_TINY
     global G_RANDOM_ARRIVALS
+    global G_THREADS
 
     G_DATA_DIST_APPLICATION = 'dimentions'        
 
@@ -264,7 +267,8 @@ def set_defaults():
     G_TINY = False
 
     G_RANDOM_ARRIVALS = False
-        
+    G_THREADS = 1
+
 def parse_probability_options(options):
     global G_EXP_PARAMETER
     global G_EXP_ARRAY
@@ -396,7 +400,34 @@ def report_input():
             print variable[2:], ":\t", value
 
 
+def threads_kossman_arr(total_jobs, worker_jobs, thread_no):
+    w_start = (thread_no * worker_jobs) + 1
+    w_finish = w_start + worker_jobs - 1
+    if w_finish > total_jobs:
+        w_finish = total_jobs 
 
+    columns = G_ARRIVALS * G_DIMENTIONS 
+    size = w_finish - w_start
+
+    os.system('./generator {0} {1} {2} tmp_{3}_{4} > /dev/null'\
+              .format(columns, G_DATA_DIST, size,TIME,thread_no))
+
+
+def threads_kossman_dim(total_jobs, worker_jobs, thread_no):
+    w_start = (thread_no * worker_jobs) + 1
+    w_finish = w_start + worker_jobs - 1
+    if w_finish > total_jobs:
+        w_finish = total_jobs 
+
+    if w_finish - w_start <= 0:
+        workload = range(w_start,total_jobs + 1)
+    else:
+        workload = range(w_start,w_finish + 1)
+    
+    columns = G_ARRIVALS
+    for i in workload:
+        os.system('./generator {0} {1} {2} tmp_{3}_{4} > /dev/null'\
+                  .format(columns, G_DATA_DIST, G_SIZE,TIME,i))
 
 def call_kossman():
     if not os.path.isfile(GENERATOR):
@@ -406,15 +437,26 @@ def call_kossman():
         os.system('g++ {0} -o generator'.format(GENERATOR))
 
     if G_DATA_DIST_APPLICATION == 'dimentions':
-        kossman_columns = G_ARRIVALS * G_DIMENTIONS
-        os.system('./generator {0} {1} {2} tmp_{3} > /dev/null'\
-                      .format(kossman_columns, G_DATA_DIST, G_SIZE,TIME))
-
+        total_jobs = G_DIMENTIONS
+        worker_jobs = int(math.ceil(G_DIMENTIONS / G_THREADS))
+        threads = []
+        for i in range(0,G_THREADS):
+            th = Process(target=threads_kossman_dim,args=(total_jobs,\
+                                                          worker_jobs,i,))
+            th.start()
+            threads.append(th)
     else:
-        kossman_columns = G_ARRIVALS
-        for i in range(0,G_DIMENTIONS - 1):
-            os.system('./generator {0} {1} {2} tmp_{3}_{4} > /dev/null'\
-                          .format(kossman_columns, G_DATA_DIST, G_SIZE,TIME,i))
+        total_jobs = G_SIZE
+        worker_jobs = int(math.ceil(G_SIZE / G_THREADS))
+        threads = []
+        for i in range(0,G_THREADS):
+            th = Process(target=threads_kossman_arr,args=(total_jobs,\
+                                                          worker_jobs,i,))
+            th.start()
+            threads.append(th)
+
+
+    return threads
 
 def generate_arrivals():    
     global G_ARRIVALS  # G_ARRIVALS is set to the max amount of arrivals overall
@@ -461,11 +503,15 @@ def main(argv):
 
     if not G_ARRIVALS:
         arrivals = generate_arrivals()    
-        print arrivals
 
-    call_kossman()
+    threads = call_kossman()
     
-    
+    # generate timestamps
+
+    for th in threads:
+        th.join()
+
+    # parse tmp files
 
 if __name__ == "__main__":
     main(sys.argv[1:])
