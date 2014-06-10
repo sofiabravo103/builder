@@ -419,7 +419,8 @@ def main(argv):
 
     if not G_ARRIVALS:
         arrivals = generate_arrivals()    
-        
+        print arrivals
+
     call_kossman()
     
     
