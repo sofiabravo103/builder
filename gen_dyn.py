@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, sys, getopt, random, logging, time
+import os, sys, getopt, random, logging, time, numpy
 TIME = time.time()
 GENERATOR = 'generador.cpp'
 
@@ -211,6 +211,7 @@ def set_defaults():
     global G_DATA_DIST_APPLICATION
     global G_DATA_DIST
     global G_POISS_PARAMETER
+    global G_ARRIVALS
     global G_EXP_PARAMETER
     global G_AUTO
     global G_TINY
@@ -220,9 +221,10 @@ def set_defaults():
 
     G_DATA_DIST = 'E'
 
+    G_POISS_PARAMETER = random.randint(1,10)
+    G_ARRIVALS = None
     G_EXP_PARAMETER = random.random() * 20
     
-    G_POISS_PARAMETER = random.randint(1,10)
     
     G_AUTO = False
     G_TINY = False
@@ -373,18 +375,54 @@ def call_kossman():
         for i in range(0,G_DIMENTIONS - 1):
             os.system('./generator {0} {1} {2} tmp_{3}_{4} > /dev/null'\
                           .format(kossman_columns, G_DATA_DIST, G_SIZE,TIME,i))
+
+def generate_arrivals():    
+    global G_ARRIVALS  # G_ARRIVALS is set to the max amount of arrivals overall
+    arrivals = []
+    max_arr = []
+
+    if G_RANDOM_ARRIVALS:
+
+        for i in range(0,G_DIMENTIONS):
+            dim_random_events = random.sample(xrange(1,10),G_SIZE)
+            arrivals.append(dim_random_events)            
+            max_arr.append(max(dim_random_events))
+
+    else:      
+        if G_POISS_PARAMETER is not None:
+            # Single poisson parameter for all dimentions
+            for i in range(0,G_DIMENTIONS):
+                numpy_arr = numpy.random.poisson(G_POISS_PARAMETER,G_SIZE)
+                dim_poiss_events = numpy_arr.tolist()
+                arrivals.append(dim_poiss_events)
+                max_arr.append(max(dim_poiss_events))
             
+        else:
+            # A different poisson parameter for each dimetion
+            for i in range(0,G_DIMENTIONS):
+                numpy_arr = numpy.random.poisson(G_POISS_ARRAY[i],G_SIZE)
+                dim_poiss_events = numpy_arr.tolist()
+                arrivals.append(dim_poiss_events)
+                max_arr.append(max(dim_poiss_events))
+
+    G_ARRIVALS = max(max_arr)    
+    return arrivals
+        
+
 def main(argv):
-    options= get_options(argv)
+    options = get_options(argv)
     check_options(options)
     parse_input(options)
 
     if G_VERBOSE:
         report_input()
 
-#    call_kossman()
+    if not G_ARRIVALS:
+        arrivals = generate_arrivals()    
+        
+    call_kossman()
     
-
+    
 
 if __name__ == "__main__":
     main(sys.argv[1:])
