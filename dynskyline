@@ -1,8 +1,6 @@
 #!/usr/bin/python
 
 import os, sys, getopt, random, logging, time, numpy, math
-from multiprocessing import Process
-
 
 TIME = time.time()
 GENERATOR = 'generador.cpp'
@@ -13,7 +11,6 @@ gen_dyn  -o <outputfile> --autodataset
 gen_dyn  -o <outputfile> --autotiny
 
 Options:
- --threads <num>        parallel execution, specify how many threads to produce 
 
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
                         by default poisson distribution is used  
@@ -35,7 +32,8 @@ Options:
                         will be used to generate arrival timestamps) 
                         example: --exparray 0.5%2%4 for 3 dimentions.
 
-  -v                    verbose output  
+  -v                    verbose output 
+ 
   --autodataset         generate medium to small random parameters for the 
                         entire dataset (to generate a quick and dirty dataset
                         for tests)
@@ -47,8 +45,8 @@ Options:
   --correlated          use correlated data distribution
   --uniform             use uniform data distribution (default)
 
- --distributearr        data distribution refers to arrivals 
- --distributedim        data distribution refers to dimentions (default)
+ --distributearr        data distribution refers to arrivals (default)
+ --distributedim        data distribution refers to dimentions 
 
   --rarrival            generate random arrival times, instead of exponential.
 '''
@@ -59,7 +57,7 @@ def get_options(argv):
         long_options = ['exparray=', 'expparameter=','autodataset', 'autotiny',\
                             'anticorrelated', 'correlated', 'uniform',\
                             'distributearr', 'distributedim', 'rarrival',\
-                        'poissarray=','poissparameter=','arrivals=','threads=']
+                        'poissarray=','poissparameter=','arrivals=']
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
         if not options:         
             print help_text
@@ -171,38 +169,18 @@ def check_poiss_array(arg,options):
         raise Exception('Error: --poissparameter and --poissarray cannot be '+\
                             'seleceted together')
 
-def check_threads_parameter(arg):
-    if '-' in arg or '.' in arg:
-        raise Exception('Error: threads parameter must be a positive '+\
-                        'integer number')
-    try: 
-        f = int(arg)
-    except ValueError:
-        raise Exception('Error: threads parameter is not a number.')
-        
-    if f == 0:
-        raise Exception('Error: threads parameter must be greater than'+\
-                            ' zero.')
-    if f > 10:
-        raise Exception('Error: threads parameter execeds 10.')
 
 
 def check_auto(options):
     opt_list = [x for x,y in options]
-    if len(options) >= 2:
-        counter = len(options)                
+    if len(options) >= 3:
+        if '-v' in opt_list:
+            return
 
-    if '-v' in opt_list:
-        counter = counter - 1
-                
-    if '--threads' in opt_list:
-        counter = counter - 1
-
-    if counter > 2:
         raise Exception('Error: options --autodataset or '+\
                         '--autotiny cannot be selected with '+\
                         'any other option')
-
+        
 
 
 def check_options(options):
@@ -217,8 +195,6 @@ def check_options(options):
             check_dimentions(arg)
         elif opt == '-o':
             check_outputfile(arg)
-        elif opt == '--threads':
-            check_threads_parameter(arg)
         elif opt == '--poissparameter':
             check_poiss_parameter(arg)
             check_not_arrivals(options)
@@ -252,9 +228,9 @@ def set_defaults():
     global G_AUTO
     global G_TINY
     global G_RANDOM_ARRIVALS
-    global G_THREADS
 
-    G_DATA_DIST_APPLICATION = 'dimentions'        
+
+    G_DATA_DIST_APPLICATION = 'arrivals'        
 
     G_DATA_DIST = 'E'
 
@@ -267,7 +243,7 @@ def set_defaults():
     G_TINY = False
 
     G_RANDOM_ARRIVALS = False
-    G_THREADS = 1
+
 
 def parse_probability_options(options):
     global G_EXP_PARAMETER
@@ -306,12 +282,15 @@ def parse_datadist_options(options):
 
     for opt, arg in options:        
       if opt == '--anticorrelated':
+          raise NotImplementedError 
           G_DATA_DIST = 'A'
       elif opt == '--correlated':
+          raise NotImplementedError 
           G_DATA_DIST = 'C'
-      elif opt == '--distributearr':
+      elif opt == '--distributedim':
+          raise NotImplementedError 
           global G_DATA_DIST_APPLICATION
-          G_DATA_DIST_APPLICATION = 'arr'
+          G_DATA_DIST_APPLICATION = 'dimentions'
 
 
 def parse_short_options(options):
@@ -373,7 +352,6 @@ def parse_auto(options):
 def parse_input(options):
     global G_VERBOSE
     global OUTPUTFILE
-    global G_THREADS
     G_VERBOSE = False
 
     set_defaults()
@@ -383,8 +361,6 @@ def parse_input(options):
             G_VERBOSE = True
         elif opt == '-o':
             G_OUTPUTFILE = open(arg,'w')
-        elif opt == '--threads':
-            G_THREADS = int(arg)
         
     if not parse_auto(options):
         parse_short_options(options)
@@ -400,34 +376,6 @@ def report_input():
             print variable[2:], ":\t", value
 
 
-def threads_kossman_arr(total_jobs, worker_jobs, thread_no):
-    w_start = (thread_no * worker_jobs) + 1
-    w_finish = w_start + worker_jobs - 1
-    if w_finish > total_jobs:
-        w_finish = total_jobs 
-
-    columns = G_ARRIVALS * G_DIMENTIONS 
-    size = w_finish - w_start
-
-    os.system('./generator {0} {1} {2} tmp_{3}_{4} > /dev/null'\
-              .format(columns, G_DATA_DIST, size,TIME,thread_no))
-
-
-def threads_kossman_dim(total_jobs, worker_jobs, thread_no):
-    w_start = (thread_no * worker_jobs) + 1
-    w_finish = w_start + worker_jobs - 1
-    if w_finish > total_jobs:
-        w_finish = total_jobs 
-
-    if w_finish - w_start <= 0:
-        workload = range(w_start,total_jobs + 1)
-    else:
-        workload = range(w_start,w_finish + 1)
-    
-    columns = G_ARRIVALS
-    for i in workload:
-        os.system('./generator {0} {1} {2} tmp_{3}_{4} > /dev/null'\
-                  .format(columns, G_DATA_DIST, G_SIZE,TIME,i))
 
 def call_kossman():
     if not os.path.isfile(GENERATOR):
@@ -437,26 +385,12 @@ def call_kossman():
         os.system('g++ {0} -o generator'.format(GENERATOR))
 
     if G_DATA_DIST_APPLICATION == 'dimentions':
-        total_jobs = G_DIMENTIONS
-        worker_jobs = int(math.ceil(G_DIMENTIONS / G_THREADS))
-        threads = []
-        for i in range(0,G_THREADS):
-            th = Process(target=threads_kossman_dim,args=(total_jobs,\
-                                                          worker_jobs,i,))
-            th.start()
-            threads.append(th)
+        pass
+
     else:
-        total_jobs = G_SIZE
-        worker_jobs = int(math.ceil(G_SIZE / G_THREADS))
-        threads = []
-        for i in range(0,G_THREADS):
-            th = Process(target=threads_kossman_arr,args=(total_jobs,\
-                                                          worker_jobs,i,))
-            th.start()
-            threads.append(th)
+        pass
 
 
-    return threads
 
 def generate_arrivals():    
     global G_ARRIVALS  # G_ARRIVALS is set to the max amount of arrivals overall
@@ -504,14 +438,9 @@ def main(argv):
     if not G_ARRIVALS:
         arrivals = generate_arrivals()    
 
-    threads = call_kossman()
+    call_kossman()
     
     # generate timestamps
-
-    for th in threads:
-        th.join()
-
-    # parse tmp files
 
 if __name__ == "__main__":
     main(sys.argv[1:])
