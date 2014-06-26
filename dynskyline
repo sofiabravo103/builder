@@ -5,12 +5,17 @@ import os, sys, getopt, random, logging, time, numpy, math
 TIME = time.time()
 GENERATOR = 'generador.cpp'
 
+# Dataset will be generated with CONS_DATASET 
+# times the number of rows of the testcase  
+CONS_DATASET = 3 
+
 help_text = '''Usage:
 gen_dyn [options] -o <outputfile> -s <size> -d <dimentions> 
 gen_dyn  -o <outputfile> --autodataset
 gen_dyn  -o <outputfile> --autotiny
 
 Options:
+ --testcases <num>      generate different testcases according to the same file  
 
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
                         by default poisson distribution is used  
@@ -57,7 +62,7 @@ def get_options(argv):
         long_options = ['exparray=', 'expparameter=','autodataset', 'autotiny',\
                             'anticorrelated', 'correlated', 'uniform',\
                             'distributearr', 'distributedim', 'rarrival',\
-                        'poissarray=','poissparameter=','arrivals=']
+                        'poissarray=','poissparameter=','arrivals=','testcases=']
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
         if not options:         
             print help_text
@@ -154,6 +159,19 @@ def check_poiss_parameter(arg):
         raise Exception('Error: poisson parameter(s) must be greater than'+\
                             ' zero.')
 
+def check_testcases(arg):
+    if '-' in arg or '.' in arg:
+        raise Exception('Error: testcases parameter must be a positive '+\
+                        'integer number')
+    try: 
+        f = int(arg)
+    except ValueError:
+        raise Exception('Error: testcases parameter is not a number.')
+
+    if f == 0:
+        raise Exception('Error: testcases parameter must be greater than'+\
+                        ' zero.')
+
 def check_poiss_array(arg,options):
     poiss_array = arg.split('%')
     dimentions = int([y for x,y in options if x == '-d'][0])
@@ -173,15 +191,21 @@ def check_poiss_array(arg,options):
 
 def check_auto(options):
     opt_list = [x for x,y in options]
+
     if len(options) >= 3:
+        counter = len(options)
+
         if '-v' in opt_list:
-            return
+            counter = counter - 1
 
-        raise Exception('Error: options --autodataset or '+\
-                        '--autotiny cannot be selected with '+\
-                        'any other option')
+        if '--testcases' in opt_list:
+            counter = counter - 1
+
+        if counter > 2:
+            raise Exception('Error: options --autodataset or '+\
+                            '--autotiny cannot be selected with '+\
+                            'any other option')
         
-
 
 def check_options(options):
     auto = False
@@ -198,6 +222,8 @@ def check_options(options):
         elif opt == '--poissparameter':
             check_poiss_parameter(arg)
             check_not_arrivals(options)
+        elif opt == '--testcases':
+            check_testcases(arg)
         elif opt == '--poissarray':
             check_poiss_array(arg,options)
             check_not_arrivals(options)
@@ -228,6 +254,7 @@ def set_defaults():
     global G_AUTO
     global G_TINY
     global G_RANDOM_ARRIVALS
+    global G_TESTCASES
 
 
     G_DATA_DIST_APPLICATION = 'arrivals'        
@@ -237,7 +264,7 @@ def set_defaults():
     G_POISS_PARAMETER = random.randint(1,10)
     G_ARRIVALS = None
     G_EXP_PARAMETER = random.random() * 20
-    
+    G_TESTCASES = 1
     
     G_AUTO = False
     G_TINY = False
@@ -313,8 +340,8 @@ def set_autodataset_values():
     if G_TINY:
         max_dim = 3
 
-        min_size = 5
-        max_size = 10
+        min_size = 4
+        max_size = 7
 
         min_arr = 3
         max_arr = 4
@@ -349,9 +376,11 @@ def parse_auto(options):
             set_autodataset_values()
     return G_AUTO
 
+
 def parse_input(options):
     global G_VERBOSE
     global OUTPUTFILE
+    global G_TESTCASES
     G_VERBOSE = False
 
     set_defaults()
@@ -361,6 +390,8 @@ def parse_input(options):
             G_VERBOSE = True
         elif opt == '-o':
             G_OUTPUTFILE = open(arg,'w')
+        elif opt == '--testcases':
+            G_TESTCASES = arg
         
     if not parse_auto(options):
         parse_short_options(options)
@@ -376,7 +407,6 @@ def report_input():
             print variable[2:], ":\t", value
 
 
-
 def call_kossman():
     if not os.path.isfile(GENERATOR):
         raise Exception('Error: kossman generator does exist')
@@ -384,16 +414,19 @@ def call_kossman():
     if not os.path.isfile('generador'):
         os.system('g++ {0} -o generator'.format(GENERATOR))
 
-    if G_DATA_DIST_APPLICATION == 'dimentions':
-        pass
-
+    if G_DATA_DIST_APPLICATION == 'arrivals':
+        if G_TESTCASES > 1:
+            size = G_SIZE * G_DIMENTIONS * CONS_DATASET
+        else:
+            size = G_DIMENTIONS * G_SIZE
+        dimentions = G_ARRIVALS
+        os.system('./generator {0} {1} {2} tmp_{3}'.format(dimentions, G_DATA_DIST,size,TIME))
+        
     else:
         pass
 
 
-
-def generate_arrivals():    
-    global G_ARRIVALS  # G_ARRIVALS is set to the max amount of arrivals overall
+def create_arrival():    
     arrivals = []
     max_arr = []
 
@@ -421,10 +454,49 @@ def generate_arrivals():
                 arrivals.append(dim_poiss_events)
                 max_arr.append(max(dim_poiss_events))
 
-    G_ARRIVALS = max(max_arr)    
+    overall_max = max(max_arr)
+    return (overall_max,arrivals)
+
+def generate_arrivals():
+    arrivals = []
+    max_arr = [] 
+    global G_ARRIVALS
+    for i in range(0,G_TESTCASES):
+        tpl = create_arrival()
+        max_arr.append(tpl[0])
+        arrivals.append(tpl[1])
+
+    G_ARRIVALS = max(max_arr)
     return arrivals
+        
+def generate_timestamps(size):
+    
+    numpy_arr = numpy.random.exponential(G_POISS_PARAMETER,size)
+    timestamps = numpy_arr.tolist()
+    return timestamps
+    
 
+def select_random_rows():
+    tmp_file = open('tmp_{0}'.format(TIME), 'r')
+    testcase_row_num = G_SIZE * G_DIMENTIONS
+    rows_index = sorted(random.sample(range(0, testcase_row_num * CONS_DATASET), \
+                                      testcase_row_num))
+    rows = []
 
+    # skip first row
+    tmp_file.readline()
+
+    for i,line in enumerate(tmp_file):
+        if i in rows_index:
+            rows.append(line)
+
+    tmp_file.close()
+    return rows
+    
+
+def generate_dataset():
+    pass
+    
         
 
 def main(argv):
@@ -436,11 +508,11 @@ def main(argv):
         report_input()
 
     if not G_ARRIVALS:
-        arrivals = generate_arrivals()    
-
+        arrival = generate_arrivals()    
+        
     call_kossman()
     
-    # generate timestamps
+    generate_dataset() 
 
 if __name__ == "__main__":
     main(sys.argv[1:])
