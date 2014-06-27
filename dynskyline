@@ -573,6 +573,8 @@ def generate_datasets(arrival_arr):
             testcase = testcase + 1
     else:
         create_dataset(arrival_arr.pop())
+    
+    os.system('rm tmp_{0}'.format(TIME))
 
         
 def main(argv):
