@@ -15,7 +15,7 @@ gen_dyn  -o <outputfile> --autodataset
 gen_dyn  -o <outputfile> --autotiny
 
 Options:
- --testcases <num>      generate different testcases according to the same file  
+ -v                     verbose output 
 
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
                         by default poisson distribution is used  
@@ -24,7 +24,7 @@ Options:
                         The parameter specifies average arrival events per minute
                         (defaut is a random number between 1 and 10)
 
-  --poissarray <string> specify a string containg poisson parameters separated
+ --poissarray <string>  specify a string containg poisson parameters separated
                         with an '%' (used when different poisson parameters 
                         will be used to generate arrival events) 
                         example: --poissarray 5%2%10 for 3 dimentions.
@@ -37,8 +37,11 @@ Options:
                         will be used to generate arrival timestamps) 
                         example: --exparray 0.5%2%4 for 3 dimentions.
 
-  -v                    verbose output 
- 
+ --testcases <num>      generate different testcases according to the same file  
+
+ --leavereport          leave a report file describing the parameters used to 
+                        create the testcase(s) 
+
   --autodataset         generate medium to small random parameters for the 
                         entire dataset (to generate a quick and dirty dataset
                         for tests)
@@ -67,7 +70,8 @@ def get_options(argv):
         long_options = ['exparray=', 'expparameter=','autodataset', 'autotiny',\
                             'anticorrelated', 'correlated', 'uniform',\
                             'distributearr', 'distributedim', 'rarrival',\
-                        'poissarray=','poissparameter=','arrivals=','testcases=']
+                        'poissarray=','poissparameter=','arrivals=','testcases=',\
+                        'leavereport']
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
         if not options:         
             print help_text
@@ -197,13 +201,17 @@ def check_poiss_array(arg,options):
 def check_auto(options):
     opt_list = [x for x,y in options]
 
-    if len(options) >= 3:
+    if len(options) > 2:
+        print options
         counter = len(options)
 
         if '-v' in opt_list:
             counter = counter - 1
 
         if '--testcases' in opt_list:
+            counter = counter - 1
+
+        if '--leavereport' in opt_list:
             counter = counter - 1
 
         if counter > 2:
@@ -260,7 +268,9 @@ def set_defaults():
     global G_TINY
     global G_RANDOM_ARRIVALS
     global G_TESTCASES
+    global G_LEAVE_REPORT
 
+    G_LEAVE_REPORT = False
 
     G_DATA_DIST_APPLICATION = 'arrivals'        
 
@@ -386,6 +396,7 @@ def parse_input(options):
     global G_VERBOSE
     global G_OUTPUTFILE
     global G_TESTCASES
+    global G_LEAVE_REPORT
     G_VERBOSE = False
 
     set_defaults()
@@ -397,7 +408,9 @@ def parse_input(options):
             G_OUTPUTFILE = arg
         elif opt == '--testcases':
             G_TESTCASES = int(arg)
-        
+        elif opt == '--leavereport':
+            G_LEAVE_REPORT = True
+
     if not parse_auto(options):
         parse_short_options(options)
         parse_datadist_options(options)
@@ -405,11 +418,19 @@ def parse_input(options):
 
 
 def report_input():
-    print 'Generating dataset according to:'        
-    for variable in globals():
-        if 'G_' in variable:
-            value = eval(variable)
-            print variable[2:], ":\t", value
+    if G_LEAVE_REPORT:
+        of = open('report_{0}'.format(G_OUTPUTFILE),'w')
+        
+    if G_VERBOSE or G_LEAVE_REPORT:
+        print 'Generating dataset according to:'        
+        for variable in globals():
+            if 'G_' in variable:
+                value = eval(variable)
+                line = str(variable[2:]) +  ':\t' + str(value)
+                if G_LEAVE_REPORT:
+                    of.write(line + '\n')
+                if G_VERBOSE:
+                    print line
 
 
 def call_kossman():
