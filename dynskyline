@@ -104,7 +104,7 @@ def check_arrivals(arg):
 
 
 def check_outputfile(arg):
-    if os.path.isfile(arg):
+    if os.path.isfile(arg) or os.path.isfile(arg + '_0'):
         ans = raw_input('Warning: file "{0}" exists, continue? [Y/n]: '.format(arg))
         while not (ans == 'y' or ans == 'n' or ans == ''):
             ans = raw_input("Please type 'y' or 'n': ")
@@ -379,7 +379,7 @@ def parse_auto(options):
 
 def parse_input(options):
     global G_VERBOSE
-    global OUTPUTFILE
+    global G_OUTPUTFILE
     global G_TESTCASES
     G_VERBOSE = False
 
@@ -389,9 +389,9 @@ def parse_input(options):
         if opt == '-v':            
             G_VERBOSE = True
         elif opt == '-o':
-            G_OUTPUTFILE = open(arg,'w')
+            G_OUTPUTFILE = arg
         elif opt == '--testcases':
-            G_TESTCASES = arg
+            G_TESTCASES = int(arg)
         
     if not parse_auto(options):
         parse_short_options(options)
@@ -420,13 +420,13 @@ def call_kossman():
         else:
             size = G_DIMENTIONS * G_SIZE
         dimentions = G_ARRIVALS
-        os.system('./generator {0} {1} {2} tmp_{3}'.format(dimentions, G_DATA_DIST,size,TIME))
+        os.system('./generator {0} {1} {2} tmp_{3} > /dev/null'.format(dimentions, G_DATA_DIST,size,TIME))
         
     else:
         pass
 
 
-def create_arrival():    
+def create_poisson_arrival():    
     arrivals = []
     max_arr = []
 
@@ -457,48 +457,124 @@ def create_arrival():
     overall_max = max(max_arr)
     return (overall_max,arrivals)
 
-def generate_arrivals():
+
+
+def generate_poisson_arrivals():
     arrivals = []
     max_arr = [] 
     global G_ARRIVALS
     for i in range(0,G_TESTCASES):
-        tpl = create_arrival()
+        tpl = create_poisson_arrival()
         max_arr.append(tpl[0])
         arrivals.append(tpl[1])
 
     G_ARRIVALS = max(max_arr)
     return arrivals
-        
-def generate_timestamps(size):
     
-    numpy_arr = numpy.random.exponential(G_POISS_PARAMETER,size)
-    timestamps = numpy_arr.tolist()
+
+
+def create_fixed_arrival():    
+    arrivals = []
+
+    for i in range(0,G_DIMENTIONS):
+        dim_list = []
+        for j in range(0,G_SIZE):
+            dim_list.append(G_ARRIVALS)
+
+        arrivals.append(dim_list)
+
+    return arrivals
+
+def generate_fixed_arrivals():
+    arrivals = []
+    for i in range(0,G_TESTCASES):        
+        arr_list = create_fixed_arrival()
+        arrivals.append(arr_list)
+
+    return arrivals
+    
+
+def generate_timestamps(size):
+    if G_POISS_PARAMETER != None:
+        numpy_arr = numpy.random.exponential(G_POISS_PARAMETER,size)
+    else:
+        numpy_arr = numpy.random.exponential(G_ARRIVALS,size)
+        timestamps = numpy_arr.tolist()
+
     return timestamps
     
 
 def select_random_rows():
     tmp_file = open('tmp_{0}'.format(TIME), 'r')
-    testcase_row_num = G_SIZE * G_DIMENTIONS
-    rows_index = sorted(random.sample(range(0, testcase_row_num * CONS_DATASET), \
-                                      testcase_row_num))
-    rows = []
-
+    
     # skip first row
     tmp_file.readline()
 
-    for i,line in enumerate(tmp_file):
-        if i in rows_index:
-            rows.append(line)
+    rows = []
+
+    if G_TESTCASES != 1:
+        testcase_row_num = G_SIZE * G_DIMENTIONS
+        rows_index = sorted(random.sample(range(0, testcase_row_num * CONS_DATASET), \
+                                          testcase_row_num))
+
+
+        for i,line in enumerate(tmp_file):
+            if i in rows_index:
+                line_parsed = line.split()
+                rows.append(line_parsed)
+    else:
+
+        for line in tmp_file:
+            line_parsed = line.split()
+            rows.append(line_parsed)
 
     tmp_file.close()
+    random.shuffle(rows)
     return rows
     
 
-def generate_dataset():
-    pass
+def create_dataset(arrivals, testcase_num=None):
+    rows = select_random_rows()    
+    tuples = G_SIZE   
+    dims = range(1,G_DIMENTIONS + 1)
+    dim = dims.pop(0)
+    result = []
     
-        
+    for dim in range(1,G_DIMENTIONS + 1):        
+        tuple_arr = arrivals.pop(0)
+        for tuple_id in range(0,G_SIZE):
+            values = rows.pop(0)
+            arr = tuple_arr.pop(0)
+            timestamps = generate_timestamps(arr)
+            ts_acum = 0.0
+            for i in range(0,arr):
+                val = values.pop(0)
+                ts = timestamps.pop(0)
+                ts_acum = ts_acum + ts               
+                result.append((ts_acum, dim, float(val),))
+    
+    if testcase_num != None:
+        file_name = G_OUTPUTFILE + '_' + str(testcase_num)            
+    else:
+        file_name = G_OUTPUTFILE
 
+    testcase_tuples = str(sorted(result))[1:-1]
+
+    of = open(file_name,'w')
+    of.write(testcase_tuples)
+    of.close()
+
+
+def generate_datasets(arrival_arr):
+    if G_TESTCASES != 1:
+        testcase = 0
+        for arrival in arrival_arr:
+            create_dataset(arrival,testcase)
+            testcase = testcase + 1
+    else:
+        create_dataset(arrival_arr.pop())
+
+        
 def main(argv):
     options = get_options(argv)
     check_options(options)
@@ -508,11 +584,16 @@ def main(argv):
         report_input()
 
     if not G_ARRIVALS:
-        arrival = generate_arrivals()    
+        arrival_arr = generate_poisson_arrivals()    
+    else:
+        arrival_arr = generate_fixed_arrivals()    
         
     call_kossman()
     
-    generate_dataset() 
+    generate_datasets(arrival_arr) 
+
+    if G_VERBOSE:
+        print '\nDone!'
 
 if __name__ == "__main__":
     main(sys.argv[1:])
