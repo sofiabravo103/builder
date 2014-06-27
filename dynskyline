@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-import os, sys, getopt, random, logging, time, numpy, math
+import os, sys, getopt, random, logging, time, numpy, math, linecache
 
 TIME = time.time()
 GENERATOR = 'generador.cpp'
@@ -55,6 +55,11 @@ Options:
 
   --rarrival            generate random arrival times, instead of exponential.
 '''
+
+def print_verbose_message(msg):
+    if G_VERBOSE:
+        sys.stdout.write(msg)
+        sys.stdout.flush()
 
 
 def get_options(argv):
@@ -420,7 +425,16 @@ def call_kossman():
         else:
             size = G_DIMENTIONS * G_SIZE
         dimentions = G_ARRIVALS
-        os.system('./generator {0} {1} {2} tmp_{3} > /dev/null'.format(dimentions, G_DATA_DIST,size,TIME))
+
+    if G_VERBOSE:
+        sys.stdout.write('\nCreating tmp file with Kossmann generator...')        
+        sys.stdout.flush()
+
+    os.system('./generator {0} {1} {2} tmp_{3} > /dev/null'.format(dimentions, G_DATA_DIST,size,TIME))
+
+    if G_VERBOSE:
+        sys.stdout.write(' done\n')
+        sys.stdout.flush()
         
     else:
         pass
@@ -499,31 +513,41 @@ def generate_timestamps(size):
         numpy_arr = numpy.random.exponential(G_POISS_PARAMETER,size)
     else:
         numpy_arr = numpy.random.exponential(G_ARRIVALS,size)
-        timestamps = numpy_arr.tolist()
+    timestamps = numpy_arr.tolist()
 
     return timestamps
     
 
-def select_random_rows():
+def select_random_rows(testcase):
     tmp_file = open('tmp_{0}'.format(TIME), 'r')
     
-    # skip first row
-    tmp_file.readline()
-
     rows = []
 
     if G_TESTCASES != 1:
+        print_verbose_message('Selecting random columns for testcase #{0}...'\
+                             .format(testcase))
+
         testcase_row_num = G_SIZE * G_DIMENTIONS
-        rows_index = sorted(random.sample(range(0, testcase_row_num * CONS_DATASET), \
+        rows_index = sorted(random.sample(range(0, testcase_row_num * \
+                                                CONS_DATASET), \
                                           testcase_row_num))
+        for i in rows_index:
+            # Rows are slided two positions, the first one beacuse 
+            # the first line of the file is not used. 
+            # The second because linecache cannot read line 0
 
+            line = linecache.getline('tmp_{0}'.format(TIME), i + 2)
+            if line == '':
+                raise Exception('Error: Problem with linecache with line {0}'\
+                                .format(i))
+            line_parsed = line.split()
+            rows.append(line_parsed)
+            
+        print_verbose_message(' done\n')
 
-        for i,line in enumerate(tmp_file):
-            if i in rows_index:
-                line_parsed = line.split()
-                rows.append(line_parsed)
     else:
-
+        # skip first row
+        tmp_file.readline()
         for line in tmp_file:
             line_parsed = line.split()
             rows.append(line_parsed)
@@ -534,12 +558,14 @@ def select_random_rows():
     
 
 def create_dataset(arrivals, testcase_num=None):
-    rows = select_random_rows()    
+    rows = select_random_rows(testcase_num)    
     tuples = G_SIZE   
     dims = range(1,G_DIMENTIONS + 1)
     dim = dims.pop(0)
     result = []
     
+    print_verbose_message('Creating dataset for testcase....')
+
     for dim in range(1,G_DIMENTIONS + 1):        
         tuple_arr = arrivals.pop(0)
         for tuple_id in range(0,G_SIZE):
@@ -552,7 +578,9 @@ def create_dataset(arrivals, testcase_num=None):
                 ts = timestamps.pop(0)
                 ts_acum = ts_acum + ts               
                 result.append((ts_acum, dim, float(val),))
-    
+
+    print_verbose_message(' done\n')
+    print_verbose_message('Writing output file for testcase... ')
     if testcase_num != None:
         file_name = G_OUTPUTFILE + '_' + str(testcase_num)            
     else:
@@ -563,7 +591,7 @@ def create_dataset(arrivals, testcase_num=None):
     of = open(file_name,'w')
     of.write(testcase_tuples)
     of.close()
-
+    print_verbose_message(' done\n')
 
 def generate_datasets(arrival_arr):
     if G_TESTCASES != 1:
@@ -589,13 +617,14 @@ def main(argv):
         arrival_arr = generate_poisson_arrivals()    
     else:
         arrival_arr = generate_fixed_arrivals()    
-        
+
+
     call_kossman()
-    
+
     generate_datasets(arrival_arr) 
 
     if G_VERBOSE:
-        print '\nDone!'
+        print '\nEverything done!'
 
 if __name__ == "__main__":
     main(sys.argv[1:])
