@@ -617,33 +617,62 @@ def read_medium_file(file_name):
         rows.append(line_parsed)
         a = a + 1
 
+    linecache.clearcache()
+
     print_verbose_message('\r done\n')
     return rows
 
+    
+def big_file_warning():
+    msg = '''Warning: Parameters selected led to a very big file
+    and it will take a long time to generate your testcase.
+    Do you still want to continue? [N/y]: '''
 
-def select_random_rows(testcase):
+    ans = raw_input(msg)
+    while not (ans == 'y' or ans == 'n' or ans == ''):
+        ans = raw_input("Please type 'y' or 'n': ")
+    if ans == 'y':
+        return
+    sys.exit()
+    
+    
+
+def read_single_testcase(file_name):
+    tmp_file = open(file_name,'r')
+    rows = []
+    # skip first row
+    tmp_file.readline()
+    for line in tmp_file:
+        line_parsed = line.split()
+        rows.append(line_parsed)
+        
+    tmp_file.close()
+    return rows
+
+
+
+def select_rows(testcase):
     if G_RESUME is not None:
         file_name = G_RESUME
     else:
         file_name = 'tmp_{0}'.format(TIME)
+        
+    big_file = False
 
-    rows = []    
+    print os.stat(file_name).st_size
+    if os.stat(file_name).st_size > 1000000000:
+        big_file_warning()
+        big_file = True
 
     if G_TESTCASES != 1:
         print_verbose_message('Selecting columns for testcase #{0}...\n'\
                               .format(testcase))
-
-        rows = read_medium_file(file_name)
+        if big_file:
+            rows = read_long_file(file_name)
+        else:
+            rows = read_medium_file(file_name)
     else:
-        tmp_file = open(file_name,'r')
-
-        # skip first row
-        tmp_file.readline()
-        for line in tmp_file:
-            line_parsed = line.split()
-            rows.append(line_parsed)
-            
-        tmp_file.close()
+        rows = read_single_testcase(file_name)
 
     random.shuffle(rows)
     return rows
@@ -667,7 +696,7 @@ def write_output_file(data_list , testcase_num):
 
 
 def create_dataset(arrivals, testcase_num=None):
-    rows = select_random_rows(testcase_num)    
+    rows = select_rows(testcase_num)    
     tuples = G_SIZE   
     dims = range(1,G_DIMENTIONS + 1)
     dim = dims.pop(0)
