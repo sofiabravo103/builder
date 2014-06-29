@@ -1,3 +1,3 @@
 Dependencies:
 
-1. python numpy package 
+1. python numpy package (install with pip)
