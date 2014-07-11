@@ -29,14 +29,6 @@ Options:
                         will be used to generate arrival events) 
                         example: --poissarray 5%2%10 for 3 dimentions.
 
- --expparameter <num>   exponential parameter to use when generating arrival 
-                        timestamps (defaut is a random number between 1 and 20)
-
-  --exparray <string>   specify a string containg exponential parameters separated
-                        with an '%' (used when different exponential parameters 
-                        will be used to generate arrival timestamps) 
-                        example: --exparray 0.5%2%4 for 3 dimentions.
-
  --testcases <num>      generate different testcases according to the same file  
 
  --leavereport          leave a report file describing the parameters used to 
@@ -71,9 +63,9 @@ def print_verbose_message(msg):
 
 def get_options(argv):
     try:
-        long_options = ['exparray=', 'expparameter=','autodataset', 'autotiny',\
-                            'anticorrelated', 'correlated', 'uniform',\
-                            'distributearr', 'distributedim', 'rarrival',\
+        long_options = ['autodataset', 'autotiny',\
+                        'anticorrelated', 'correlated', 'uniform',\
+                        'distributearr', 'distributedim', 'rarrival',\
                         'poissarray=','poissparameter=','arrivals=','testcases=',\
                         'leavereport','resume=','dontdelete']
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
@@ -128,35 +120,6 @@ def check_tmpfile(arg):
     if not os.path.isfile(arg):
         raise Exception('Error: tmp file {0} does not exist'.format(arg))
 
-
-def check_exp_parameter(arg):
-    if '-' in arg:
-        raise Exception('Error: exponential parameter(s) must be a positive'+\
-                            ' number')
-    try: 
-        f = float(arg)
-    except ValueError:
-        raise Exception('Error: exponential parameter(s) is not a number.')
-
-    if f == 0.0:
-        raise Exception('Error: exponential parameter(s) must be greater than'+\
-                            ' zero.')
-
-
-def check_exp_array(arg,options):
-    exp_array = arg.split('%')
-    dimentions = int([y for x,y in options if x == '-d'][0])
-    if len(exp_array) != dimentions:
-        raise Exception('Error: --exparray has bad format (is the number of '+\
-                            'values in the array equal to the number of '+\
-                            'dimentions?)')
-    for num in exp_array:
-        check_exp_parameter(num)
-
-    opt_list = [x for x,y in options]
-    if '--expparameter' in opt_list:
-        raise Exception('Error: --expparameter and --exparray cannot be '+\
-                            'seleceted together')
 
 def check_not_arrivals(options):
     opt_list = [x for x,y in options]
@@ -258,10 +221,6 @@ def check_options(options):
             check_not_arrivals(options)
         elif opt == '--arrrivals':
             check_arrivals(arg)
-        elif opt == '--expparameter':
-            check_exp_parameter(arg)
-        elif opt == '--exparray':
-            check_exp_array(arg,options)
         elif opt == '--autodataset' or opt == '--autotiny':
             check_auto(options)
             auto = True
@@ -279,7 +238,6 @@ def set_defaults():
     global G_DATA_DIST
     global G_POISS_PARAMETER
     global G_ARRIVALS
-    global G_EXP_PARAMETER
     global G_AUTO
     global G_TINY
     global G_RANDOM_ARRIVALS
@@ -303,7 +261,6 @@ def set_defaults():
 
     G_POISS_PARAMETER = random.randint(1,100)
     G_ARRIVALS = None
-    G_EXP_PARAMETER = random.random() * 20
     G_TESTCASES = 1
     
     G_AUTO = False
@@ -313,37 +270,26 @@ def set_defaults():
 
 
 def parse_probability_options(options):
-    global G_EXP_PARAMETER
-    global G_EXP_ARRAY
     global G_POISS_PARAMETER
     global G_POISS_ARRAY
     global G_ARRIVALS
     
 
     for opt, arg in options: 
-      if opt == '--expparameter':
-          G_EXP_PARAMETER = float(arg)
+        if opt == '--arrivals':  
+            G_ARRIVALS = int(arg)
+            G_POISS_PARAMETER = None
 
-      elif opt == '--exparray':
-          G_EXP_PARAMETER = None
-          G_EXP_ARRAY = [float(x) for x in arg.split('%')]
+        elif opt == '--poissparameter':
+            G_POISS_PARAMETER = int(arg)
 
-      elif opt == '--arrivals':  
-          G_ARRIVALS = int(arg)
-          G_POISS_PARAMETER = None
+        elif opt == '--poissarray':
+            G_POISS_PARAMETER = None
+            G_POISS_ARRAY = [int(x) for x in arg.split('%')]          
 
-      elif opt == '--poissparameter':
-          G_POISS_PARAMETER = int(arg)
-
-      elif opt == '--poissarray':
-          G_POISS_PARAMETER = None
-          G_POISS_ARRAY = [int(x) for x in arg.split('%')]          
-
-      elif opt == '--rarrival':
-          global G_RANDOM_ARRIVALS
-          G_EXP_PARAMETER = None
-          G_EXP_ARRAY = None
-          G_RANDOM_ARRIVALS = True
+        elif opt == '--rarrival':
+            global G_RANDOM_ARRIVALS
+            G_RANDOM_ARRIVALS = True
 
 def parse_datadist_options(options):
     global G_DATA_DIST
@@ -659,7 +605,7 @@ def select_rows(testcase):
         
     big_file = False
 
-    print os.stat(file_name).st_size
+    # print os.stat(file_name).st_size
     if os.stat(file_name).st_size > 1000000000:
         big_file_warning()
         big_file = True
