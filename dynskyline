@@ -674,19 +674,20 @@ def write_output_file(data_list , testcase_num):
 
     of = open(file_name,'w')
     list_len = len(testcase_tuples)
-
-    if list_len < 1000:
+    max_line_size = 5000
+    
+    if list_len < max_line_size:
         of.write(str(testcase_tuples))
         return
 
     counter = 0
     processed_elements = 0
-    last_line = list_len % 1000
+    last_line = list_len % max_line_size
     tmp_list = []
 
     for value in testcase_tuples:
         
-        if counter == 1000:
+        if counter == max_line_size:
             of.write(str(tmp_list) + '\n')
             counter = 0
             tmp_list = []
