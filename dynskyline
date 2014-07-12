@@ -705,7 +705,7 @@ def create_dataset(arrivals, testcase_num=None):
             for i in range(0,arr):
                 val = values.pop(0)
                 ts = timestamps.pop(0)
-                result.append((ts, dim, float(val),))
+                result.append((ts, tuple_id, dim, float(val),))
 
     print_verbose_message('\r done\n')
     write_output_file(result, testcase_num)
