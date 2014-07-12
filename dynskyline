@@ -716,7 +716,7 @@ def create_dataset(arrivals, testcase_num=None):
     
     t = G_SIZE * G_DIMENTIONS 
     s = 0
-    for dim in range(1,G_DIMENTIONS + 1):        
+    for dim in range(0,G_DIMENTIONS):        
         tuple_arr = arrivals.pop(0)
         for tuple_id in range(0,G_SIZE):
             values = rows.pop(0)
