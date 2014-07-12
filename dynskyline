@@ -670,10 +670,34 @@ def write_output_file(data_list , testcase_num):
     else:
         file_name = G_OUTPUTFILE
 
-    testcase_tuples = str(sorted(data_list))[1:-1]
+    testcase_tuples = sorted(data_list)
 
     of = open(file_name,'w')
-    of.write(testcase_tuples)
+    list_len = len(testcase_tuples)
+
+    if list_len < 1000:
+        of.write(str(testcase_tuples))
+        return
+
+    counter = 0
+    processed_elements = 0
+    last_line = list_len % 1000
+    tmp_list = []
+
+    for value in testcase_tuples:
+        
+        if counter == 1000:
+            of.write(str(tmp_list) + '\n')
+            counter = 0
+            tmp_list = []
+
+        if processed_elements == list_len - last_line:
+            of.write(str(tmp_list))
+
+        tmp_list.append(value)
+        counter+=1
+        processed_elements+=1
+
     of.close()
     print_verbose_message(' done\n')
 
