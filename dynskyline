@@ -17,6 +17,10 @@ gen_dyn  -o <outputfile> --autotiny
 Options:
  -v                     verbose output 
 
+ --time                 specify the simulation time. Output may exceed this 
+                        parameter. By default is a random number between 0 and
+                        1800. 
+
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
                         by default poisson distribution is used  
 
@@ -63,7 +67,7 @@ def print_verbose_message(msg):
 
 def get_options(argv):
     try:
-        long_options = ['autodataset', 'autotiny',\
+        long_options = ['time=', 'autodataset', 'autotiny',\
                         'anticorrelated', 'correlated', 'uniform',\
                         'distributearr', 'distributedim', 'rarrival',\
                         'poissarray=','poissparameter=','arrivals=','testcases=',\
@@ -153,6 +157,19 @@ def check_testcases(arg):
         raise Exception('Error: testcases parameter must be greater than'+\
                         ' zero.')
 
+def check_simulation_time(arg):
+    if '-' in arg or '.' in arg:
+        raise Exception('Error: simulation time parameter must be a positive '+\
+                        'integer number')
+    try: 
+        f = int(arg)
+    except ValueError:
+        raise Exception('Error: simulation time parameter is not a number.')
+
+    if f == 0:
+        raise Exception('Error: simulation time parameter must be greater than'+\
+                        ' zero.')
+
 def check_poiss_array(arg,options):
     poiss_array = arg.split('%')
     dimentions = int([y for x,y in options if x == '-d'][0])
@@ -209,6 +226,8 @@ def check_options(options):
             check_dimentions(arg)
         elif opt == '-o':
             check_outputfile(arg)
+        elif opt == '--time':
+            check_simulation_time(arg)
         elif opt == '--resume':
             check_tmpfile(arg)
         elif opt == '--poissparameter':
@@ -246,13 +265,15 @@ def set_defaults():
     global G_VERBOSE
     global G_DELETE_TMP
     global G_RESUME
+    global G_SIMULATION_TIME
+    global G_POISS_ARRAY
 
     G_RESUME = None
     G_DELETE_TMP = True
 
     G_VERBOSE = False
 
-    
+    G_POISS_ARRAY = None
     G_LEAVE_REPORT = False
 
     G_DATA_DIST_APPLICATION = 'arrivals'        
@@ -260,6 +281,7 @@ def set_defaults():
     G_DATA_DIST = 'E'
 
     G_POISS_PARAMETER = random.randint(1,100)
+    G_SIMULATION_TIME = random.randint(1,1800)
     G_ARRIVALS = None
     G_TESTCASES = 1
     
@@ -371,6 +393,7 @@ def parse_input(options):
     global G_LEAVE_REPORT
     global G_RESUME
     global G_DELETE_TMP
+    global G_SIMULATION_TIME
 
     set_defaults()
 
@@ -387,6 +410,8 @@ def parse_input(options):
             G_RESUME = arg
         elif opt == '--dontdelete':
             G_DELETE_TMP = False
+        elif opt == '--time':
+            G_SIMULATION_TIME = float(arg)
 
     if not parse_auto(options):
         parse_short_options(options)
@@ -510,13 +535,27 @@ def generate_fixed_arrivals():
     
 
 def generate_timestamps(size):
+
     if G_POISS_PARAMETER != None:
-        numpy_arr = numpy.random.exponential(G_POISS_PARAMETER,size)
+        numpy_arr = numpy.random.exponential\
+                    (G_SIMULATION_TIME / G_POISS_PARAMETER,size)        
+    elif G_POISS_ARRAY:
+        raise NotImplementedError
     else:
-        numpy_arr = numpy.random.exponential(G_ARRIVALS,size)
-    timestamps = numpy_arr.tolist()
+        numpy_arr = numpy.random.exponential\
+                    (G_SIMULATION_TIME / G_ARRIVALS,size)
+    timestamp_intervals = numpy_arr.tolist()
+    
+    time_counter = 0.0
+    timestamps = []
+
+
+    for interval in timestamp_intervals:
+        time_counter = time_counter + interval
+        timestamps.append(time_counter)
 
     return timestamps
+
     
 
 def read_long_file(file_name):
@@ -658,7 +697,6 @@ def create_dataset(arrivals, testcase_num=None):
             values = rows.pop(0)
             arr = tuple_arr.pop(0)
             timestamps = generate_timestamps(arr)
-            ts_acum = 0.0
 
             s = s + 1
             p = (s * 100) / t
@@ -667,8 +705,7 @@ def create_dataset(arrivals, testcase_num=None):
             for i in range(0,arr):
                 val = values.pop(0)
                 ts = timestamps.pop(0)
-                ts_acum = ts_acum + ts               
-                result.append((ts_acum, dim, float(val),))
+                result.append((ts, dim, float(val),))
 
     print_verbose_message('\r done\n')
     write_output_file(result, testcase_num)
