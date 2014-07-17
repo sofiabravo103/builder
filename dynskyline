@@ -663,6 +663,7 @@ def select_rows(testcase):
     return rows
 
 
+
 def write_output_file(data_list , testcase_num):    
     print_verbose_message('Writing output file... ')
     if testcase_num != None:
@@ -680,24 +681,24 @@ def write_output_file(data_list , testcase_num):
         of.write(str(testcase_tuples))
         return
 
-    counter = 0
-    processed_elements = 0
+    line_counter = 0
+    processed_elements_overall = 0
     last_line = list_len % max_line_size
     tmp_list = []
 
     for value in testcase_tuples:
         
-        if counter == max_line_size:
+        if line_counter == max_line_size:
             of.write(str(tmp_list) + '\n')
-            counter = 0
+            processed_elements_overall +=line_counter
+            line_counter = 0
             tmp_list = []
 
-        if processed_elements == list_len - last_line:
+        if processed_elements_overall == list_len - last_line:
             of.write(str(tmp_list))
 
         tmp_list.append(value)
-        counter+=1
-        processed_elements+=1
+        line_counter+=1
 
     of.close()
     print_verbose_message(' done\n')
