@@ -1,6 +1,15 @@
 #!/usr/bin/python
 
-import os, sys, getopt, random, logging, time, numpy, math, linecache
+import os
+import sys
+import getopt 
+import random 
+import logging 
+import time 
+import numpy 
+import math 
+import linecache
+import resource
 from os.path import dirname, abspath
 
 TIME = time.time()
@@ -639,10 +648,27 @@ def read_long_file(file_name):
 
     return rows
 
+
+def check_memory():
+    G_MAX_MEM = 7
+    max_mem_kb = G_MAX_MEM * 1024 * 1024
+    mem_used = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss    
+    perc_mem_used = math.ceil((mem_used * 100.0) / max_mem_kb)
+
+    
+    if perc_mem_used >= 99:
+        linecache.clearcache()
+
+
 def read_medium_file(file_name):
     testcase_row_num = G_SIZE * G_DIMENTIONS
-    rows_index = sorted(random.sample(range(0, testcase_row_num \
-                                            * CONS_DATASET), testcase_row_num))
+    if G_TESTCASES > 1:
+        rows_index = sorted(random.sample(range(0, testcase_row_num \
+                                                * CONS_DATASET), \
+                                          testcase_row_num))
+    else:
+        rows_index = sorted(random.sample(range(0, testcase_row_num), \
+                                          testcase_row_num))
     t = len(rows_index)
     a = 0
     rows = []
@@ -658,9 +684,8 @@ def read_medium_file(file_name):
                             .format(i))
         line_parsed = line.split()
         rows.append(line_parsed)
+        check_memory()
         a = a + 1
-
-    linecache.clearcache()
 
     print_verbose_message('\r done\n')
     return rows
@@ -680,17 +705,23 @@ def big_file_warning():
     
     
 
-def read_single_testcase(file_name):
-    tmp_file = open(file_name,'r')
-    rows = []
-    # skip first row
-    tmp_file.readline()
-    for line in tmp_file:
-        line_parsed = line.split()
-        rows.append(line_parsed)
-        
-    tmp_file.close()
-    return rows
+# def read_single_testcase(file_name):
+#     print_verbose_message('Reading file to generate dataset...\n')
+#     tmp_file = open(file_name,'r')
+#     rows = []
+#     # skip first row
+#     tmp_file.readline()
+#     p = 0
+#     max_p = G_SIZE * G_DIMENTIONS
+#     for line in tmp_file:
+#         line_parsed = line.split()
+#         rows.append(line_parsed)
+#         p = p + 1
+#         print_verbose_message('\r{0}%'.format((p* 100) / max_p))
+
+#     print_verbose_message('\rdone\n')
+#     tmp_file.close()
+#     return rows
 
 
 
@@ -707,19 +738,19 @@ def select_rows(testcase):
         big_file_warning()
         big_file = True
 
-    if G_TESTCASES != 1:
+    if G_TESTCASES > 1:
         print_verbose_message('Selecting columns for testcase #{0}...\n'\
                               .format(testcase))
-        if big_file:
-            rows = read_long_file(file_name)
-        else:
-            rows = read_medium_file(file_name)
     else:
-        rows = read_single_testcase(file_name)
+        print_verbose_message('Selecting columns for testcase...\n')
+
+    if big_file:
+        rows = read_long_file(file_name)
+    else:
+        rows = read_medium_file(file_name)
 
     random.shuffle(rows)
     return rows
-
 
 
 def write_output_file(data_list , testcase_num):    
