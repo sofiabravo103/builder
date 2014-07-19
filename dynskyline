@@ -471,7 +471,6 @@ def report_settings():
 
                 if r_value == 'SIMULATION_TIME':
                     r_value = 'SIMULATION_SECONDS'
-                print r_value
                 line = r_value + ':\t' + l_value
                 of_settings.write('D_' + line + '\n')        
                 
