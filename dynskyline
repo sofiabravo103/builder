@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 import os, sys, getopt, random, logging, time, numpy, math, linecache
+from os.path import dirname, abspath
 
 TIME = time.time()
 GENERATOR = 'generador.cpp'
@@ -42,6 +43,13 @@ Options:
                         leavereport but adjusted to the Dynasty Algorithm input.
                         The report will be appended to the file specified. 
 
+ --expirations          specify when a value expires for each dimention. This
+                        value will not affect testcases generation, but will be
+                        used for report and written to settings if 
+                        --leavesettings option is indicated. Input is a string
+                        containg expiration values separated with an '%'. 
+                        example: --expirations 5%2%10 for 3 dimentions.
+
  --resume  <file>       resume execution from specified tmp file 
 
  --dontdelete           keep kossmann tmp file (default is delete the file)
@@ -57,8 +65,8 @@ Options:
   --correlated          use correlated data distribution
   --uniform             use uniform data distribution (default)
 
- --distributearr        data distribution refers to arrivals (default)
- --distributedim        data distribution refers to dimentions 
+  --distributearr       data distribution refers to arrivals (default)
+  --distributedim       data distribution refers to dimentions 
 
   --rarrival            generate random arrival times, instead of exponential.
 '''
@@ -70,12 +78,27 @@ def print_verbose_message(msg):
 
 
 def get_options(argv):
+    long_options =  [\
+                     'autodataset', \
+                     'autotiny',\
+                     'anticorrelated', \
+                     'correlated', \
+                     'uniform', \
+                     'leavereport', \
+                     'distributearr', \
+                     'distributedim', \
+                     'rarrival',\
+                     'dontdelete',\
+                     'poissarray=',\
+                     'poissparameter=',\
+                     'arrivals=',\
+                     'testcases=',\
+                     'leavesettings=', \
+                     'resume=',\
+                     'expirations=',\
+                     'time=']
+
     try:
-        long_options = ['time=', 'autodataset', 'autotiny',\
-                        'anticorrelated', 'correlated', 'uniform',\
-                        'distributearr', 'distributedim', 'rarrival',\
-                        'poissarray=','poissparameter=','arrivals=','testcases=',\
-                        'leavereport', 'leavesettings=', 'resume=','dontdelete']
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
         if not options:         
             print help_text
@@ -85,14 +108,6 @@ def get_options(argv):
         sys.exit(2)
     return options
 
-def check_size(arg):
-    if '.' in arg or '-' in arg:
-        raise Exception('Error: size value (-s) value must be a positive'+\
-                            'integer.')
-    try: 
-        int(arg)
-    except ValueError:
-        raise Exception('Error: size value (-s) is not a number')
 
 def check_dimentions(arg):    
     if '.' in arg or '-' in arg:
@@ -135,44 +150,19 @@ def check_not_arrivals(options):
         raise Exception('Error: --arrivals cannot be selected along with '+\
                         '--poissparameter or --poissarray')
 
-def check_poiss_parameter(arg):
+def check_num_parameter(arg,name,option):
     if '-' in arg or '.' in arg:
-        raise Exception('Error: poisson parameter(s) must be a positive '+\
+        raise Exception('Error: '+ name +' parameter(s) must be a positive '+\
                             'integer number')
     try: 
         f = int(arg)
     except ValueError:
-        raise Exception('Error: poisson parameter(s) is not a number.')
-
+        raise Exception('Error: '+ name +' parameter('+ option \
+                        +') is not a number.')
     if f == 0:
-        raise Exception('Error: poisson parameter(s) must be greater than'+\
-                            ' zero.')
+        raise Exception('Error: '+ name +' parameter ('+ option \
+                        +') must be greater than zero.')
 
-def check_testcases(arg):
-    if '-' in arg or '.' in arg:
-        raise Exception('Error: testcases parameter must be a positive '+\
-                        'integer number')
-    try: 
-        f = int(arg)
-    except ValueError:
-        raise Exception('Error: testcases parameter is not a number.')
-
-    if f == 0:
-        raise Exception('Error: testcases parameter must be greater than'+\
-                        ' zero.')
-
-def check_simulation_time(arg):
-    if '-' in arg or '.' in arg:
-        raise Exception('Error: simulation time parameter must be a positive '+\
-                        'integer number')
-    try: 
-        f = int(arg)
-    except ValueError:
-        raise Exception('Error: simulation time parameter is not a number.')
-
-    if f == 0:
-        raise Exception('Error: simulation time parameter must be greater than'+\
-                        ' zero.')
 
 def check_poiss_array(arg,options):
     poiss_array = arg.split('%')
@@ -182,13 +172,22 @@ def check_poiss_array(arg,options):
                             'values in the array equal to the number of '+\
                             'dimentions?)')
     for num in poiss_array:
-        check_poiss_parameter(num)
+        check_num_parameter(num,'poisson','--poissarray')
 
     opt_list = [x for x,y in options]
     if '--poissparameter' in opt_list:
         raise Exception('Error: --poissparameter and --poissarray cannot be '+\
                             'seleceted together')
 
+def check_expirations_array(arg,options):
+    exp_array = arg.split('%')
+    dimentions = int([y for x,y in options if x == '-d'][0])
+    if len(exp_array) != dimentions:
+        raise Exception('Error: --expirations has bad format (is the number'+\
+                        'of values in the array equal to the number of '+\
+                        'dimentions?)')
+    for num in exp_array:
+        check_num_parameter(num,'expirations','--expirations')
 
 
 def check_auto(options):
@@ -221,6 +220,16 @@ def check_auto(options):
                             'any other option')
         
 
+def check_everything_set(auto, opt_list):
+    if not auto:
+        if '-s' not in opt_list:
+            raise Exception('Error: unless --autodataset or --autotiny are '+\
+                                'selected size value (-s) must be specified')
+        if '-d' not in opt_list:
+            raise Exception('Error: unless --autodataset or --autotiny are '+\
+                                'selected dimentions value (-d) must be specified')
+
+
 def check_options(options):
     auto = False
     opt_list = [x for x,y in options]
@@ -228,22 +237,24 @@ def check_options(options):
         raise Exception('Error: no output file selected')
     for opt, arg in options:
         if opt == '-s':
-            check_size(arg)
+            check_num_parameter(arg,'size',opt)
         elif opt == '-d':
             check_dimentions(arg)
         elif opt == '-o':
             check_outputfile(arg)
+        elif opt == '--expirations':
+            check_expirations_array(arg,options)
         elif opt == '--leavesettings':
             check_file_existence(arg, 'settings')
         elif opt == '--time':
-            check_simulation_time(arg)
+            check_num_parameter(arg,'simulation time',opt)
         elif opt == '--resume':
             check_file_existence(arg, 'tmp')
         elif opt == '--poissparameter':
-            check_poiss_parameter(arg)
+            check_num_parameter(arg,'poisson',opt)
             check_not_arrivals(options)
         elif opt == '--testcases':
-            check_testcases(arg)
+            check_num_parameter(arg,'testcases',opt)
         elif opt == '--poissarray':
             check_poiss_array(arg,options)
             check_not_arrivals(options)
@@ -253,13 +264,7 @@ def check_options(options):
             check_auto(options)
             auto = True
 
-    if not auto:
-        if '-s' not in opt_list:
-            raise Exception('Error: unless --autodataset or --autotiny are '+\
-                                'selected size value (-s) must be specified')
-        if '-d' not in opt_list:
-            raise Exception('Error: unless --autodataset or --autotiny are '+\
-                                'selected dimentions value (-d) must be specified')
+    check_everything_set(auto,opt_list)
 
 def set_defaults():
     global G_DATA_DIST_APPLICATION
@@ -277,30 +282,24 @@ def set_defaults():
     global G_RESUME
     global G_SIMULATION_TIME
     global G_POISS_ARRAY
+    global G_EXPIRATIONS
 
     G_SETTINGS_FILE = None
     G_RESUME = None
     G_DELETE_TMP = True
-
     G_VERBOSE = False
-
     G_POISS_ARRAY = None
     G_LEAVE_REPORT = False
-
     G_DATA_DIST_APPLICATION = 'arrivals'        
-
     G_DATA_DIST = 'E'
-
     G_POISS_PARAMETER = random.randint(1,100)
     G_SIMULATION_TIME = random.randint(1,1800)
     G_ARRIVALS = None
     G_TESTCASES = 1
-    
     G_AUTO = False
     G_TINY = False
-
     G_RANDOM_ARRIVALS = False
-
+    G_EXPIRATIONS = []
 
 def parse_probability_options(options):
     global G_POISS_PARAMETER
@@ -403,6 +402,7 @@ def parse_input(options):
     global G_TESTCASES
     global G_LEAVE_REPORT    
     global G_SETTINGS_FILE
+    global G_EXPIRATIONS
     global G_RESUME
     global G_DELETE_TMP
     global G_SIMULATION_TIME
@@ -420,8 +420,8 @@ def parse_input(options):
             G_LEAVE_REPORT = True
         elif opt == '--leavesettings':
             G_SETTINGS_FILE = arg
-        elif opt == '--leavesettings':
-            G_SETTINGS_FILE = True
+        elif opt == '--expirations':
+            G_EXPIRATIONS = [int(x) for x in arg.split('%')]
         elif opt == '--resume':
             G_RESUME = arg
         elif opt == '--dontdelete':
@@ -435,15 +435,53 @@ def parse_input(options):
         parse_probability_options(options)
 
 
-def report_input():
+def report_settings():
     if G_SETTINGS_FILE is not None:
         of_settings = open(G_SETTINGS_FILE,'a')
         of_settings.write('\n')
+        ommited = [\
+                   'TESTCASES','POISS_ARRAY', 'VERBOSE','RESUME','ARRIVALS',\
+                   'SETTINGS_FILE', 'DATA_DIST_APPLICATION','DATA_DIST',
+                   'RANDOM_ARRIVALS','POISS_PARAMETER','TINY','DELETE_TMP',
+                   'LEAVE_REPORT','AUTO']
 
+        for variable in globals():
+            if 'G_' in variable:
+                r_value = str(variable[2:])
+                l_value = str(eval(variable))
+
+                if r_value in ommited:
+                    continue
+
+                if r_value == 'SIZE':
+                    r_value = 'TUPLES'
+
+                if r_value == 'EXPIRATIONS':
+                    r_value = 'EXPIRATION_TIMES'
+                    if l_value == '[]':
+                        l_value = str([random.randint(1,G_ARRIVALS)\
+                                   for x in range(0,G_DIMENTIONS)])
+
+                if r_value == 'OUTPUTFILE':
+                    l_value = "'"+ str(eval(variable)) +"_output'"
+                    path_list = str(abspath(__file__)).split('/')[:-1]
+                    path =  '/'.join(path_list)
+                    of_settings.write('D_INPUTFILE = '+ path + '/' + \
+                                      str(eval(variable)) + '\n')
+
+                if r_value == 'SIMULATION_TIME':
+                    r_value = 'SIMULATION_SECONDS'
+                print r_value
+                line = r_value + ':\t' + l_value
+                of_settings.write('D_' + line + '\n')        
+                
+        of_settings.close()
+
+def report_input():
     if G_LEAVE_REPORT:
         of_report = open('{0}_report'.format(G_OUTPUTFILE),'w')
                     
-    if G_VERBOSE or G_LEAVE_REPORT or G_SETTINGS_FILE is not None:
+    if G_VERBOSE or G_LEAVE_REPORT:
         print 'Generating dataset according to:'        
         for variable in globals():
             if 'G_' in variable:
@@ -451,10 +489,6 @@ def report_input():
                 line = str(variable[2:]) +  ':\t' + str(value)
                 if G_LEAVE_REPORT:
                     of_report.write(line + '\n')
-
-                if G_SETTINGS_FILE is not None:
-                    of_settings.write('D_' + line + '\n')
-                    
 
                 if G_VERBOSE:
                     print line
@@ -782,14 +816,14 @@ def main(argv):
     check_options(options)
     parse_input(options)
 
-    if G_VERBOSE or G_LEAVE_REPORT or G_LEAVE_SETTINGS:
-        report_input()
-
     if not G_ARRIVALS:
         arrival_arr = generate_poisson_arrivals()    
     else:
         arrival_arr = generate_fixed_arrivals()    
 
+    if G_VERBOSE or G_LEAVE_REPORT or G_LEAVE_SETTINGS:
+        report_input()
+        report_settings()
 
     call_kossman()
 
