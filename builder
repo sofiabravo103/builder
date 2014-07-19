@@ -14,6 +14,8 @@ from os.path import dirname, abspath
 
 TIME = time.time()
 GENERATOR = 'generador.cpp'
+MAX_ACTUALIZATIONS_LIST_SIZE = 5000
+MAX_KOSSMAN_DATA_LIST_SIZE = 1000 
 
 # Dataset will be generated with CONS_DATASET 
 # times the number of rows of the testcase  
@@ -649,18 +651,20 @@ def read_long_file(file_name):
     return rows
 
 
-def check_memory():
-    G_MAX_MEM = 7
+def check_linecache_memory():
+    G_MAX_MEM = 5
     max_mem_kb = G_MAX_MEM * 1024 * 1024
     mem_used = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss    
     perc_mem_used = math.ceil((mem_used * 100.0) / max_mem_kb)
-
     
+    print 'mem_perc' + str(perc_mem_used)
+
     if perc_mem_used >= 99:
         linecache.clearcache()
+        print_verbose_message('\n[warning] linecache cleared\n')
 
 
-def read_medium_file(file_name):
+def read_medium_file(file_name=""):
     testcase_row_num = G_SIZE * G_DIMENTIONS
     if G_TESTCASES > 1:
         rows_index = sorted(random.sample(range(0, testcase_row_num \
@@ -669,26 +673,21 @@ def read_medium_file(file_name):
     else:
         rows_index = sorted(random.sample(range(0, testcase_row_num), \
                                           testcase_row_num))
-    t = len(rows_index)
-    a = 0
-    rows = []
+
     for i in rows_index:
-        print_verbose_message('\r{0}%'.format((a* 100) / t))
         # Rows are slided two positions, the first one beacuse 
         # the first line of the file is not used. 
         # The second because linecache cannot read line 0
-
+        
         line = linecache.getline(file_name, i + 2)
         if line == '':
             raise Exception('Error: Problem with linecache with line {0}'\
                             .format(i))
         line_parsed = line.split()
-        rows.append(line_parsed)
-        check_memory()
-        a = a + 1
+        yield line_parsed
+        check_linecache_memory()
 
-    print_verbose_message('\r done\n')
-    return rows
+    linecache.clearcache()
 
     
 def big_file_warning():
@@ -731,26 +730,10 @@ def select_rows(testcase):
     else:
         file_name = 'tmp_{0}'.format(TIME)
         
-    big_file = False
+    rows_generator = read_medium_file(file_name)
+    for row in rows_generator:
+        yield row
 
-    # print os.stat(file_name).st_size
-    if os.stat(file_name).st_size > 1000000000:
-        big_file_warning()
-        big_file = True
-
-    if G_TESTCASES > 1:
-        print_verbose_message('Selecting columns for testcase #{0}...\n'\
-                              .format(testcase))
-    else:
-        print_verbose_message('Selecting columns for testcase...\n')
-
-    if big_file:
-        rows = read_long_file(file_name)
-    else:
-        rows = read_medium_file(file_name)
-
-    random.shuffle(rows)
-    return rows
 
 
 def write_output_file(data_list , testcase_num):    
@@ -764,20 +747,19 @@ def write_output_file(data_list , testcase_num):
 
     of = open(file_name,'w')
     list_len = len(testcase_tuples)
-    max_line_size = 5000
     
-    if list_len < max_line_size:
+    if list_len < MAX_ACTUALIZATIONS_LIST_SIZE:
         of.write(str(testcase_tuples))
         return
 
     line_counter = 0
     processed_elements_overall = 0
-    last_line = list_len % max_line_size
+    last_line = list_len % MAX_ACTUALIZATIONS_LIST_SIZE
     tmp_list = []
 
     for value in testcase_tuples:
         
-        if line_counter == max_line_size:
+        if line_counter == MAX_ACTUALIZATIONS_LIST_SIZE:
             of.write(str(tmp_list) + '\n')
             processed_elements_overall +=line_counter
             line_counter = 0
@@ -796,7 +778,7 @@ def write_output_file(data_list , testcase_num):
 
 
 def create_dataset(arrivals, testcase_num=None):
-    rows = select_rows(testcase_num)    
+    rows_generator = select_rows(testcase_num)    
     tuples = G_SIZE   
     dims = range(1,G_DIMENTIONS + 1)
     dim = dims.pop(0)
@@ -809,13 +791,13 @@ def create_dataset(arrivals, testcase_num=None):
     for dim in range(0,G_DIMENTIONS):        
         tuple_arr = arrivals.pop(0)
         for tuple_id in range(0,G_SIZE):
-            values = rows.pop(0)
+            values = rows_generator.next()
             arr = tuple_arr.pop(0)
             timestamps = generate_timestamps(arr)
 
             s = s + 1
             p = (s * 100) / t
-            print_verbose_message('\r{0}%'.format(p))
+            print_verbose_message('\n perc_done = {0}%'.format(p))
 
             for i in range(0,arr):
                 val = values.pop(0)
