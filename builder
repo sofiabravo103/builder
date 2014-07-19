@@ -11,9 +11,9 @@ GENERATOR = 'generador.cpp'
 CONS_DATASET = 3
 
 help_text = '''Usage:
-gen_dyn [options] -o <outputfile> -s <size> -d <dimentions> 
-gen_dyn  -o <outputfile> --autodataset
-gen_dyn  -o <outputfile> --autotiny
+builder [options] -o <outputfile> -s <size> -d <dimentions> 
+builder  -o <outputfile> --autodataset
+builder  -o <outputfile> --autotiny
 
 Options:
  -v                     verbose output 
