@@ -504,6 +504,10 @@ def report_input():
                 if G_VERBOSE:
                     print line
 
+def randomize_file():
+    print_verbose_message('Randomizing kossman file...')
+    os.system('sort -R tmp_{0}'.format(TIME))
+    print_verbose_message('done.\n')
 
 def call_kossman():
     if G_RESUME is not None:        
@@ -531,6 +535,8 @@ def call_kossman():
     if G_VERBOSE:
         sys.stdout.write(' done\n')
         sys.stdout.flush()
+    
+    # randomize_file()
         
     else:
         pass
