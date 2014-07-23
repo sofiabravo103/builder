@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/bin/python
 
 import os
 import sys
@@ -10,6 +10,7 @@ import numpy
 import math 
 import linecache
 import resource
+from memory_profiler import profile
 from os.path import dirname, abspath
 
 TIME = time.time()
@@ -494,7 +495,7 @@ def report_input():
     if G_VERBOSE or G_LEAVE_REPORT:
         print 'Generating dataset according to:'        
         for variable in globals():
-            if 'G_' in variable:
+            if'G_' in variable:
                 value = eval(variable)
                 line = str(variable[2:]) +  ':\t' + str(value)
                 if G_LEAVE_REPORT:
@@ -625,114 +626,6 @@ def generate_timestamps(size):
 
     return timestamps
 
-    
-
-def read_long_file(file_name):
-    testcase_row_num = G_SIZE * G_DIMENTIONS
-    print_verbose_message('Creating random list...')
-    rows_index = sorted(random.sample(range(1, (testcase_row_num * CONS_DATASET)\
-                                            + 1), testcase_row_num))
-    print_verbose_message('done\n')
-
-    print_verbose_message('Reading tmp file...\n')
-    rows = []
-    t = len(rows_index)
-    a = 0.0
-    with open(file_name,'r') as tmpfile:
-        for i,line in enumerate(tmpfile):
-            print_verbose_message('\r {0}%'.format((a * 100) / t))
-            if i in rows_index:            
-                line_parsed = line.split()
-                rows.append(line_parsed)
-                a = a + 1
-            
-    print_verbose_message('\r done\n')
-
-    return rows
-
-
-def check_linecache_memory():
-    G_MAX_MEM = 5
-    max_mem_kb = G_MAX_MEM * 1024 * 1024
-    mem_used = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss    
-    perc_mem_used = math.ceil((mem_used * 100.0) / max_mem_kb)
-    
-    print 'mem_perc' + str(perc_mem_used)
-
-    if perc_mem_used >= 99:
-        linecache.clearcache()
-        print_verbose_message('\n[warning] linecache cleared\n')
-
-
-def read_medium_file(file_name=""):
-    testcase_row_num = G_SIZE * G_DIMENTIONS
-    if G_TESTCASES > 1:
-        rows_index = sorted(random.sample(range(0, testcase_row_num \
-                                                * CONS_DATASET), \
-                                          testcase_row_num))
-    else:
-        rows_index = sorted(random.sample(range(0, testcase_row_num), \
-                                          testcase_row_num))
-
-    for i in rows_index:
-        # Rows are slided two positions, the first one beacuse 
-        # the first line of the file is not used. 
-        # The second because linecache cannot read line 0
-        
-        line = linecache.getline(file_name, i + 2)
-        if line == '':
-            raise Exception('Error: Problem with linecache with line {0}'\
-                            .format(i))
-        line_parsed = line.split()
-        yield line_parsed
-        check_linecache_memory()
-
-    linecache.clearcache()
-
-    
-def big_file_warning():
-    msg = '''Warning: Parameters selected led to a very big file
-    and it will take a long time to generate your testcase.
-    Do you still want to continue? [N/y]: '''
-
-    ans = raw_input(msg)
-    while not (ans == 'y' or ans == 'n' or ans == ''):
-        ans = raw_input("Please type 'y' or 'n': ")
-    if ans == 'y':
-        return
-    sys.exit()
-    
-    
-
-# def read_single_testcase(file_name):
-#     print_verbose_message('Reading file to generate dataset...\n')
-#     tmp_file = open(file_name,'r')
-#     rows = []
-#     # skip first row
-#     tmp_file.readline()
-#     p = 0
-#     max_p = G_SIZE * G_DIMENTIONS
-#     for line in tmp_file:
-#         line_parsed = line.split()
-#         rows.append(line_parsed)
-#         p = p + 1
-#         print_verbose_message('\r{0}%'.format((p* 100) / max_p))
-
-#     print_verbose_message('\rdone\n')
-#     tmp_file.close()
-#     return rows
-
-
-
-def select_rows(testcase):
-    if G_RESUME is not None:
-        file_name = G_RESUME
-    else:
-        file_name = 'tmp_{0}'.format(TIME)
-        
-    rows_generator = read_medium_file(file_name)
-    for row in rows_generator:
-        yield row
 
 
 
@@ -776,6 +669,54 @@ def write_output_file(data_list , testcase_num):
 
 
 
+def check_linecache_memory():
+    G_MAX_MEM = 4
+    max_mem_kb = G_MAX_MEM * 1024 * 1024
+    mem_used = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss    
+    perc_mem_used = math.ceil((mem_used * 100.0) / max_mem_kb)
+    
+    if perc_mem_used >= 99:
+        linecache.clearcache()
+        print_verbose_message('\n[warning] linecache cleared\n')
+
+
+
+def read_file(file_name=""):
+    testcase_row_num = G_SIZE * G_DIMENTIONS
+    if G_TESTCASES > 1:
+        rows_index = sorted(random.sample(range(0, testcase_row_num \
+                                                * CONS_DATASET), \
+                                          testcase_row_num))
+    else:
+        rows_index = sorted(random.sample(range(0, testcase_row_num), \
+                                          testcase_row_num))
+
+    for i in rows_index:
+        # Rows are slided two positions, the first one beacuse 
+        # the first line of the file is not used. 
+        # The second because linecache cannot read line 0
+
+        line = linecache.getline(file_name, i + 2)
+        if line == '':
+            raise Exception('Error: Problem with linecache with line {0}'\
+                            .format(i))
+        line_parsed = line.split()
+        yield line_parsed
+        check_linecache_memory()
+
+    linecache.clearcache()    
+    
+
+
+def select_rows(testcase):
+    if G_RESUME is not None:
+        file_name = G_RESUME
+    else:
+        file_name = 'tmp_{0}'.format(TIME)
+        
+    rows_generator = read_file(file_name)
+    for row in rows_generator:
+        yield row
 
 def create_dataset(arrivals, testcase_num=None):
     rows_generator = select_rows(testcase_num)    
@@ -797,12 +738,13 @@ def create_dataset(arrivals, testcase_num=None):
 
             s = s + 1
             p = (s * 100) / t
-            print_verbose_message('\n perc_done = {0}%'.format(p))
+            print_verbose_message('\r{0}%'.format(p))
 
             for i in range(0,arr):
-                val = values.pop(0)
+                pass
+                # val = values.pop(0)
                 ts = timestamps.pop(0)
-                result.append((ts, tuple_id, dim, float(val),))
+                # result.append((ts, tuple_id, dim, float(val),))
 
     print_verbose_message('\r done\n')
     write_output_file(result, testcase_num)
