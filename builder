@@ -1,4 +1,4 @@
-#!/bin/python
+#!/usr/bin/python
 
 import os
 import sys
@@ -10,13 +10,15 @@ import numpy
 import math 
 import linecache
 import resource
-from memory_profiler import profile
+from kosmann_splitter import KosmannSplitter
 from os.path import dirname, abspath
 
 TIME = time.time()
 GENERATOR = 'generador.cpp'
 MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 MAX_KOSSMAN_DATA_LIST_SIZE = 1000 
+
+MAX_INTERMEDIATE_FILE_SIZE_GB = 0.01
 
 # Dataset will be generated with CONS_DATASET 
 # times the number of rows of the testcase  
@@ -82,7 +84,7 @@ Options:
 
   --rarrival            generate random arrival times, instead of exponential.
 '''
-
+            
 def print_verbose_message(msg):
     if G_VERBOSE:
         sys.stdout.write(msg)
@@ -674,63 +676,25 @@ def write_output_file(data_list , testcase_num):
     print_verbose_message(' done\n')
 
 
-
-def check_linecache_memory():
-    G_MAX_MEM = 4
-    max_mem_kb = G_MAX_MEM * 1024 * 1024
-    mem_used = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss    
-    perc_mem_used = math.ceil((mem_used * 100.0) / max_mem_kb)
-    
-    if perc_mem_used >= 99:
-        linecache.clearcache()
-        print_verbose_message('\n[warning] linecache cleared\n')
-
-
-
-def read_file(file_name=""):
-    testcase_row_num = G_SIZE * G_DIMENTIONS
-    if G_TESTCASES > 1:
-        rows_index = sorted(random.sample(range(0, testcase_row_num \
-                                                * CONS_DATASET), \
-                                          testcase_row_num))
-    else:
-        rows_index = sorted(random.sample(range(0, testcase_row_num), \
-                                          testcase_row_num))
-
-    for i in rows_index:
-        # Rows are slided two positions, the first one beacuse 
-        # the first line of the file is not used. 
-        # The second because linecache cannot read line 0
-
-        line = linecache.getline(file_name, i + 2)
-        if line == '':
-            raise Exception('Error: Problem with linecache with line {0}'\
-                            .format(i))
-        line_parsed = line.split()
-        yield line_parsed
-        check_linecache_memory()
-
-    linecache.clearcache()    
-    
-
-
-def select_rows(testcase):
+def get_file_name():
     if G_RESUME is not None:
-        file_name = G_RESUME
+        return '{0}'.format(G_RESUME)
     else:
-        file_name = 'tmp_{0}'.format(TIME)
-        
-    rows_generator = read_file(file_name)
-    for row in rows_generator:
-        yield row
+        return 'tmp_{0}'.format(TIME)
+
 
 def create_dataset(arrivals, testcase_num=None):
-    rows_generator = select_rows(testcase_num)    
+
+    print_verbose_message('Splitting Kosmann file into chunks... ')
+    splitter = KosmannSplitter(get_file_name(),MAX_INTERMEDIATE_FILE_SIZE_GB)
+    print_verbose_message('done.\n')
+
+    kosmann_values = splitter.values_generator()
     tuples = G_SIZE   
     dims = range(1,G_DIMENTIONS + 1)
     dim = dims.pop(0)
     result = []
-    
+
     print_verbose_message('Organizing dataset....\n')
     
     t = G_SIZE * G_DIMENTIONS 
@@ -738,7 +702,7 @@ def create_dataset(arrivals, testcase_num=None):
     for dim in range(0,G_DIMENTIONS):        
         tuple_arr = arrivals.pop(0)
         for tuple_id in range(0,G_SIZE):
-            values = rows_generator.next()
+            values = kosmann_values.next()
             arr = tuple_arr.pop(0)
             timestamps = generate_timestamps(arr)
 
@@ -753,6 +717,8 @@ def create_dataset(arrivals, testcase_num=None):
                 # result.append((ts, tuple_id, dim, float(val),))
 
     print_verbose_message('\r done\n')
+    splitter.cleanup()
+
     write_output_file(result, testcase_num)
 
 def generate_datasets(arrival_arr):
