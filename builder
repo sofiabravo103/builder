@@ -18,7 +18,7 @@ GENERATOR = 'generador.cpp'
 MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 MAX_KOSSMAN_DATA_LIST_SIZE = 1000 
 
-MAX_INTERMEDIATE_FILE_SIZE_GB = 0.01
+MAX_INTERMEDIATE_FILE_SIZE_GB = 3
 
 # Dataset will be generated with CONS_DATASET 
 # times the number of rows of the testcase  
@@ -382,11 +382,11 @@ def set_autodataset_values():
     else:
         max_dim = 5
 
-        min_size = 10000
-        max_size = 100000
+        min_size = 800000
+        max_size = 900000
         
-        min_arr = 20
-        max_arr = 50
+        min_arr = 1000
+        max_arr = 3000
 
     G_DIMENTIONS = random.randint(3,max_dim)
     G_SIZE = random.randint(min_size,max_size)
@@ -635,45 +635,49 @@ def generate_timestamps(size):
     return timestamps
 
 
-
-
-def write_output_file(data_list , testcase_num):    
-    print_verbose_message('Writing output file... ')
+def sort_and_write_outputfile(intermediate_file_name, testcase_num, act_count):
     if testcase_num != None:
         file_name = G_OUTPUTFILE + '_' + str(testcase_num)            
     else:
         file_name = G_OUTPUTFILE
 
-    testcase_tuples = sorted(data_list)
+    sorted_intermediate_file_name = intermediate_file_name + '_sorted'
 
-    of = open(file_name,'w')
-    list_len = len(testcase_tuples)
-    
-    if list_len < MAX_ACTUALIZATIONS_LIST_SIZE:
-        of.write(str(testcase_tuples))
-        return
+    print_verbose_message('Sorting dataset...')
+    os.system('sort -g {0} > {1}'.format(intermediate_file_name, sorted_intermediate_file_name))
+    print_verbose_message('done.\n')
 
+    input_f = open(sorted_intermediate_file_name)
+    output_f = open(file_name,'w')
+
+    print_verbose_message('Writing output file...\n')
     line_counter = 0
-    processed_elements_overall = 0
-    last_line = list_len % MAX_ACTUALIZATIONS_LIST_SIZE
-    tmp_list = []
-
-    for value in testcase_tuples:
+    acum = 0
+    of_line = ''
+    end_of_file_reached = False
+    
+    while not end_of_file_reached:
+        while line_counter < MAX_ACTUALIZATIONS_LIST_SIZE:
+            try:
+                line = input_f.next()
+            except StopIteration:
+                end_of_file_reached = True
+                break
+            of_line += '(' + line.rstrip('\n') + ', '
+            line_counter += 1
+            acum += 1
+            p = (acum * 100) / act_count
+            print_verbose_message('\r{0}%'.format(p))
         
-        if line_counter == MAX_ACTUALIZATIONS_LIST_SIZE:
-            of.write(str(tmp_list) + '\n')
-            processed_elements_overall +=line_counter
-            line_counter = 0
-            tmp_list = []
+        output_f.write(of_line + '\n')
+        line_counter = 0
+        of_line = ''
+    
+    output_f.close()
+    os.system('rm {0}'.format(sorted_intermediate_file_name))
+    print_verbose_message('\rdone\n')
 
-        if processed_elements_overall == list_len - last_line:
-            of.write(str(tmp_list))
 
-        tmp_list.append(value)
-        line_counter+=1
-
-    of.close()
-    print_verbose_message(' done\n')
 
 
 def get_file_name():
@@ -683,26 +687,36 @@ def get_file_name():
         return 'tmp_{0}'.format(TIME)
 
 
-def create_dataset(arrivals, testcase_num=None):
+def intermediate_file_writer(result,intermediate_file):
+    while result:
+        tp = result.pop()
 
-    print_verbose_message('Splitting Kosmann file into chunks... ')
-    splitter = KosmannSplitter(get_file_name(),MAX_INTERMEDIATE_FILE_SIZE_GB)
-    print_verbose_message('done.\n')
+        #To improve lines could be longer
+        intermediate_file.write(str(tp)[1:] + "\n")
+        yield 
 
+
+def create_dataset(arrivals, splitter, testcase_num=None):
     kosmann_values = splitter.values_generator()
     tuples = G_SIZE   
     dims = range(1,G_DIMENTIONS + 1)
     dim = dims.pop(0)
     result = []
+    intermediate_file_name = "tmp_{0}_intermediate_file".format(TIME)
+    intermediate_file = open(intermediate_file_name,'w')
+    file_writer = intermediate_file_writer(result, intermediate_file)
 
-    print_verbose_message('Organizing dataset....\n')
-    
+    print_verbose_message('Organizing dataset...\n')    
     t = G_SIZE * G_DIMENTIONS 
     s = 0
+    act_count = 0
     for dim in range(0,G_DIMENTIONS):        
         tuple_arr = arrivals.pop(0)
         for tuple_id in range(0,G_SIZE):
-            values = kosmann_values.next()
+            try:
+                values = kosmann_values.next()
+            except StopIteration:
+                break
             arr = tuple_arr.pop(0)
             timestamps = generate_timestamps(arr)
 
@@ -712,23 +726,27 @@ def create_dataset(arrivals, testcase_num=None):
 
             for i in range(0,arr):
                 pass
-                # val = values.pop(0)
+                val = values.pop(0)
                 ts = timestamps.pop(0)
-                # result.append((ts, tuple_id, dim, float(val),))
+                result.append((ts, tuple_id, dim, float(val),))
+                act_count += 1
+                file_writer.next()
 
     print_verbose_message('\r done\n')
-    splitter.cleanup()
+    intermediate_file.close()
 
-    write_output_file(result, testcase_num)
+    sort_and_write_outputfile(intermediate_file_name, testcase_num, act_count)
+    os.system("rm {0}".format(intermediate_file_name))
 
 def generate_datasets(arrival_arr):
+    splitter = KosmannSplitter(get_file_name(),MAX_INTERMEDIATE_FILE_SIZE_GB, G_VERBOSE)        
     if G_TESTCASES != 1:
         testcase = 0
         for arrival in arrival_arr:
-            create_dataset(arrival,testcase)
+            create_dataset(arrival, splitter, testcase)
             testcase = testcase + 1
     else:
-        create_dataset(arrival_arr.pop())
+        create_dataset(arrival_arr.pop(),splitter)
     
     if G_DELETE_TMP:
         if G_RESUME is not None:
@@ -736,6 +754,7 @@ def generate_datasets(arrival_arr):
         else:
             os.system('rm tmp_{0}'.format(TIME))
 
+    splitter.cleanup()
         
 def main(argv):
     options = get_options(argv)
