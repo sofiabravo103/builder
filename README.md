@@ -25,8 +25,6 @@ Generator of dynamic data following the structure of a sensor net. For the relat
 #### Python dependencies ####
 * numpy      
 ```pip install numpy```
-* linecache
-```pip install linecahce```
 * python resources <https://pypi.python.org/pypi/python-resources/0.3>
 
 ## Usage ##
@@ -71,3 +69,7 @@ builder  -o <outputfile> --autotiny
 ```--distributearr```        | data distribution refers to arrivals (default)
 ```--distributedim```        | data distribution refers to dimentions 
 ```--rarrival```             | generate random arrival times, instead of exponential
+
+## Contributors ##
+
+**Simon Bolivar University**, 2013-2014. Stephanie Alibrandi 09-10020@usb.ve, Sofia Bravo. 09-10114@usb.ve.
