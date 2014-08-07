@@ -108,8 +108,9 @@ class KosmannSplitter():
                     yield line.split()
 
         else:
-            raise Exception(':(')
-            file_reader = self.intermediate_file_reader(\
-                                                self.split_info['file_name'])
-            # for value in file_reader:
-            #     yield value
+            file_reader = self.intermediate_file_reader(self.kosmann_file_name)
+            #ignore first file from file
+            file_reader.next()
+
+            for line in file_reader:
+                yield line.split()

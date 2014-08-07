@@ -382,11 +382,11 @@ def set_autodataset_values():
     else:
         max_dim = 5
 
-        min_size = 800000
-        max_size = 900000
+        min_size = 10000
+        max_size = 100000
         
-        min_arr = 1000
-        max_arr = 3000
+        min_arr = 50
+        max_arr = 100
 
     G_DIMENTIONS = random.randint(3,max_dim)
     G_SIZE = random.randint(min_size,max_size)
