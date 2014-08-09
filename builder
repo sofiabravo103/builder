@@ -18,7 +18,7 @@ GENERATOR = 'generador.cpp'
 MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 MAX_KOSSMAN_DATA_LIST_SIZE = 1000 
 
-MAX_INTERMEDIATE_FILE_SIZE_GB = 0.08
+MAX_INTERMEDIATE_FILE_SIZE_GB = 5
 
 # Dataset will be generated with CONS_DATASET 
 # times the number of rows of the testcase  
@@ -306,8 +306,8 @@ def set_defaults():
     G_LEAVE_REPORT = False
     G_DATA_DIST_APPLICATION = 'arrivals'        
     G_DATA_DIST = 'E'
-    G_POISS_PARAMETER = random.randint(1,100)
-    G_SIMULATION_TIME = random.randint(1,1800)
+    G_POISS_PARAMETER = random.randint(5,100)
+    G_SIMULATION_TIME = random.randint(200,1800)
     G_ARRIVALS = None
     G_TESTCASES = 1
     G_AUTO = False
@@ -699,7 +699,7 @@ def create_dataset(arrivals, splitter, testcase_num=None):
     dims = range(1,G_DIMENTIONS + 1)
     dim = dims.pop(0)
     result = []
-    intermediate_file_name = "tmp_{0}_intermediate_file".format(TIME)
+    intermediate_file_name = "{0}_intermediate_file".format(get_file_name())
     intermediate_file = open(intermediate_file_name,'w')
     file_writer = intermediate_file_writer(result, intermediate_file)
 
