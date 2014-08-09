@@ -18,7 +18,7 @@ GENERATOR = 'generador.cpp'
 MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 MAX_KOSSMAN_DATA_LIST_SIZE = 1000 
 
-MAX_INTERMEDIATE_FILE_SIZE_GB = 3
+MAX_INTERMEDIATE_FILE_SIZE_GB = 5
 
 # Dataset will be generated with CONS_DATASET 
 # times the number of rows of the testcase  
@@ -638,12 +638,11 @@ def sort_file(intermediate_file_name):
     sorted_intermediate_file_name = intermediate_file_name + '_sorted'
 
     print_verbose_message('Sorting dataset...')
-    os.system('sort -g {0} > {1}'.format(intermediate_file_name, \
+    os.system('sort -T . -g {0} -o {1}'.format(intermediate_file_name, \
         sorted_intermediate_file_name))
     print_verbose_message('done.\n')
 
-    check_file_existence(sorted_intermediate_file_name, \
-        'intermediate file after sort')
+    check_file_existence(sorted_intermediate_file_name, '')
     return sorted_intermediate_file_name 
 
 
@@ -674,9 +673,9 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
             of_line += '(' + line.rstrip('\n') + ', '
             line_counter += 1
             acum += 1
-            p = (acum * 100) / act_count
-            print_verbose_message('\r{0}%'.format(p))
-        
+        p = (acum * 100) / act_count
+        print_verbose_message('\r{0}%'.format(p))
+
         output_f.write(of_line + '\n')
         line_counter = 0
         of_line = ''
@@ -718,10 +717,7 @@ def create_dataset(arrivals, splitter, testcase_num=None):
     for dim in range(0,G_DIMENTIONS):        
         tuple_arr = arrivals.pop(0)
         for tuple_id in range(0,G_SIZE):
-            try:
-                values = kosmann_values.next()
-            except StopIteration:
-                break
+            values = kosmann_values.next()
             arr = tuple_arr.pop(0)
             timestamps = generate_timestamps(arr)
 
@@ -730,7 +726,6 @@ def create_dataset(arrivals, splitter, testcase_num=None):
             print_verbose_message('\r{0}%'.format(p))
 
             for i in range(0,arr):
-                pass
                 val = values.pop(0)
                 ts = timestamps.pop(0)
                 result.append((ts, tuple_id, dim, float(val),))

@@ -1,4 +1,4 @@
-import math, os, ast, sys, linecache, resource
+import math, os, ast, sys, mmap, resource
 
 class KosmannSplitter():
 
@@ -67,22 +67,27 @@ class KosmannSplitter():
     
     @staticmethod
     def intermediate_file_reader(file_name):
-        i = 0
-        while True:
-            # Rows are slided two positions, the first one beacuse 
-            # the first line of the file is not used. 
-            # The second because linecache cannot read line 0
+        with open(file_name,'rb') as f:
+            m = mmap.mmap(f.fileno(), 0, prot=mmap.PROT_READ) #File is open read-only
+            while m.tell() != m.size():
+                yield m.readline()
+
+        # i = 0
+        # while True:
+        #     # Rows are slided two positions, the first one beacuse 
+        #     # the first line of the file is not used. 
+        #     # The second because linecache cannot read line 0
         
-            line = linecache.getline(file_name, i + 2)
-            if line == '':
-                break
-                # raise Exception('Error: Problem with linecache with line {0}'\
-                #                     .format(i))
-            yield line
-            i += 1
-            # self.check_linecache_memory()
+        #     line = linecache.getline(file_name, i + 2)
+        #     if line == '':
+        #         break
+        #         # raise Exception('Error: Problem with linecache with line {0}'\
+        #         #                     .format(i))
+        #     yield line
+        #     i += 1
+        #     # self.check_linecache_memory()
             
-        linecache.clearcache()
+        # linecache.clearcache()
 
 
         # inter_file = open(file_name)
