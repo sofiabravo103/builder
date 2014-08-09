@@ -634,11 +634,11 @@ def generate_timestamps(size):
 
     return timestamps
 
-def sort_file(intermediate_file_name)
+def sort_file(intermediate_file_name):
     sorted_intermediate_file_name = intermediate_file_name + '_sorted'
 
     print_verbose_message('Sorting dataset...')
-    os.system('sort -T . -g {0} > {1}'.format(intermediate_file_name, \
+    os.system('sort -g {0} > {1}'.format(intermediate_file_name, \
         sorted_intermediate_file_name))
     print_verbose_message('done.\n')
 
