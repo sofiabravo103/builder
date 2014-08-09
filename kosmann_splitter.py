@@ -106,16 +106,11 @@ class KosmannSplitter():
             for file_name in self.intermediate_file_names:
                 file_reader = self.intermediate_file_reader(file_name)
 
-                #ignore first file from first file
-                file_reader.next()
-
                 for line in file_reader:
                     yield line.split()
 
         else:
             file_reader = self.intermediate_file_reader(self.kosmann_file_name)
-            #ignore first file from file
-            file_reader.next()
 
             for line in file_reader:
                 yield line.split()

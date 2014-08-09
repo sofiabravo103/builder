@@ -18,7 +18,7 @@ GENERATOR = 'generador.cpp'
 MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 MAX_KOSSMAN_DATA_LIST_SIZE = 1000 
 
-MAX_INTERMEDIATE_FILE_SIZE_GB = 5
+MAX_INTERMEDIATE_FILE_SIZE_GB = 0.08
 
 # Dataset will be generated with CONS_DATASET 
 # times the number of rows of the testcase  
@@ -506,10 +506,17 @@ def report_input():
                 if G_VERBOSE:
                     print line
 
+def get_file_name():
+    if G_RESUME is not None:
+        return '{0}'.format(G_RESUME)
+    else:
+        return 'tmp_{0}'.format(TIME)
+
 def randomize_file():
     print_verbose_message('Randomizing kossman file...')
-    os.system('sort -R tmp_{0}'.format(TIME))
-    print_verbose_message('done.\n')
+    file_name = get_file_name()
+    os.system('tail -n +2 {0} | sort -R -o {1}'.format(file_name, file_name))
+    print_verbose_message(' done.\n')
 
 def call_kossman():
     if G_RESUME is not None:        
@@ -528,21 +535,14 @@ def call_kossman():
             size = G_DIMENTIONS * G_SIZE
         dimentions = G_ARRIVALS
 
-    if G_VERBOSE:
-        sys.stdout.write('\nCreating tmp file with Kossmann generator...')        
-        sys.stdout.flush()
+        print_verbose_message('Creating tmp file with Kossmann generator...')        
+        os.system('./generator {0} {1} {2} tmp_{3} > /dev/null'.format(dimentions, G_DATA_DIST,size,TIME))
+        print_verbose_message(' done.\n')
 
-    os.system('./generator {0} {1} {2} tmp_{3} > /dev/null'.format(dimentions, G_DATA_DIST,size,TIME))
-
-    if G_VERBOSE:
-        sys.stdout.write(' done\n')
-        sys.stdout.flush()
-    
-    # randomize_file()
-        
     else:
-        pass
-
+        raise NotImplementedError
+    
+    randomize_file()
 
 def create_poisson_arrival():    
     arrivals = []
@@ -640,7 +640,7 @@ def sort_file(intermediate_file_name):
     print_verbose_message('Sorting dataset...')
     os.system('sort -T . -g {0} -o {1}'.format(intermediate_file_name, \
         sorted_intermediate_file_name))
-    print_verbose_message('done.\n')
+    print_verbose_message(' done.\n')
 
     check_file_existence(sorted_intermediate_file_name, '')
     return sorted_intermediate_file_name 
@@ -682,14 +682,7 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
     
     output_f.close()
     os.system('rm {0}'.format(sorted_intermediate_file_name))
-    print_verbose_message('\rdone\n')
-
-def get_file_name():
-    if G_RESUME is not None:
-        return '{0}'.format(G_RESUME)
-    else:
-        return 'tmp_{0}'.format(TIME)
-
+    print_verbose_message('\r done.\n')
 
 def intermediate_file_writer(result,intermediate_file):
     while result:
@@ -732,7 +725,7 @@ def create_dataset(arrivals, splitter, testcase_num=None):
                 act_count += 1
                 file_writer.next()
 
-    print_verbose_message('\r done\n')
+    print_verbose_message('\r done.\n')
     intermediate_file.close()
 
     write_outputfile(intermediate_file_name, testcase_num, act_count)
