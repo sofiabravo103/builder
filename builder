@@ -634,18 +634,26 @@ def generate_timestamps(size):
 
     return timestamps
 
+def sort_file(intermediate_file_name)
+    sorted_intermediate_file_name = intermediate_file_name + '_sorted'
 
-def sort_and_write_outputfile(intermediate_file_name, testcase_num, act_count):
+    print_verbose_message('Sorting dataset...')
+    os.system('sort -T . -g {0} > {1}'.format(intermediate_file_name, \
+        sorted_intermediate_file_name))
+    print_verbose_message('done.\n')
+
+    check_file_existence(sorted_intermediate_file_name, \
+        'intermediate file after sort')
+    return sorted_intermediate_file_name 
+
+
+def write_outputfile(intermediate_file_name, testcase_num, act_count):
     if testcase_num != None:
         file_name = G_OUTPUTFILE + '_' + str(testcase_num)            
     else:
         file_name = G_OUTPUTFILE
 
-    sorted_intermediate_file_name = intermediate_file_name + '_sorted'
-
-    print_verbose_message('Sorting dataset...')
-    os.system('sort -g {0} > {1}'.format(intermediate_file_name, sorted_intermediate_file_name))
-    print_verbose_message('done.\n')
+    sorted_intermediate_file_name = sort_file(intermediate_file_name) 
 
     input_f = open(sorted_intermediate_file_name)
     output_f = open(file_name,'w')
@@ -676,9 +684,6 @@ def sort_and_write_outputfile(intermediate_file_name, testcase_num, act_count):
     output_f.close()
     os.system('rm {0}'.format(sorted_intermediate_file_name))
     print_verbose_message('\rdone\n')
-
-
-
 
 def get_file_name():
     if G_RESUME is not None:
@@ -735,7 +740,7 @@ def create_dataset(arrivals, splitter, testcase_num=None):
     print_verbose_message('\r done\n')
     intermediate_file.close()
 
-    sort_and_write_outputfile(intermediate_file_name, testcase_num, act_count)
+    write_outputfile(intermediate_file_name, testcase_num, act_count)
     os.system("rm {0}".format(intermediate_file_name))
 
 def generate_datasets(arrival_arr):
