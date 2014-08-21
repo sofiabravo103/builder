@@ -297,7 +297,9 @@ def set_defaults():
     global G_SIMULATION_TIME
     global G_POISS_ARRAY
     global G_EXPIRATIONS
+    global G_LEAVE_SETTINGS
 
+    G_LEAVE_SETTINGS  = None
     G_SETTINGS_FILE = None
     G_RESUME = None
     G_DELETE_TMP = True
@@ -552,8 +554,8 @@ def create_poisson_arrival():
 
     if G_RANDOM_ARRIVALS:
         for i in range(0,G_DIMENTIONS):
-            dim_random_events = random.sample(xrange(1,10),G_SIZE)
-            arrivals.append(dim_random_events)            
+            dim_random_events = random.sample(xrange(30,50),G_SIZE)
+            arrivals.append(dim_random_events)
             max_arr.append(max(dim_random_events))
 
     else: 
