@@ -22,7 +22,7 @@ MAX_INTERMEDIATE_FILE_SIZE_GB = 5
 
 # Dataset will be generated with CONS_DATASET 
 # times the number of rows of the testcase  
-CONS_DATASET = 3
+CONS_DATASET = 2
 
 help_text = '''Usage:
 builder [options] -o <outputfile> -s <size> -d <dimentions> 
@@ -306,8 +306,8 @@ def set_defaults():
     G_LEAVE_REPORT = False
     G_DATA_DIST_APPLICATION = 'arrivals'        
     G_DATA_DIST = 'E'
-    G_POISS_PARAMETER = random.randint(5,100)
-    G_SIMULATION_TIME = random.randint(200,1800)
+    G_POISS_PARAMETER = random.randint(3,5)
+    G_SIMULATION_TIME = random.randint(100,600)
     G_ARRIVALS = None
     G_TESTCASES = 1
     G_AUTO = False
@@ -376,8 +376,8 @@ def set_autodataset_values():
         min_size = 4
         max_size = 7
 
-        min_arr = 3
-        max_arr = 4
+        min_arr = 1
+        max_arr = 1
 
     else:
         max_dim = 5
@@ -385,8 +385,8 @@ def set_autodataset_values():
         min_size = 10000
         max_size = 100000
         
-        min_arr = 50
-        max_arr = 100
+        min_arr = 30
+        max_arr = 50
 
     G_DIMENTIONS = random.randint(3,max_dim)
     G_SIZE = random.randint(min_size,max_size)
@@ -506,7 +506,7 @@ def report_input():
                 if G_VERBOSE:
                     print line
 
-def get_file_name():
+def get_kossman_filename():
     if G_RESUME is not None:
         return '{0}'.format(G_RESUME)
     else:
@@ -514,8 +514,8 @@ def get_file_name():
 
 def randomize_file():
     print_verbose_message('Randomizing kossman file...')
-    file_name = get_file_name()
-    os.system('tail -n +2 {0} | sort -R -o {1}'.format(file_name, file_name))
+    file_name = get_kossman_filename()
+    os.system('sort -R {0} -o {1}'.format(file_name, file_name))
     print_verbose_message(' done.\n')
 
 def call_kossman():
@@ -535,31 +535,34 @@ def call_kossman():
             size = G_DIMENTIONS * G_SIZE
         dimentions = G_ARRIVALS
 
-        print_verbose_message('Creating tmp file with Kossmann generator...')        
-        os.system('./generator {0} {1} {2} tmp_{3} > /dev/null'.format(dimentions, G_DATA_DIST,size,TIME))
+        print_verbose_message('Creating tmp file with Kossmann generator...')
+        os.system('./generator {0} {1} {2} tmp_{3}_notail > /dev/null'.format(\
+            dimentions, G_DATA_DIST,size,TIME))
+        os.system('tail -n +2 tmp_{0}_notail > {1}'.format(TIME,\
+            get_kossman_filename()))
+        os.system('rm tmp_{0}_notail'.format(TIME))
         print_verbose_message(' done.\n')
 
     else:
         raise NotImplementedError
-    
-    randomize_file()
 
 def create_poisson_arrival():    
     arrivals = []
     max_arr = []
 
     if G_RANDOM_ARRIVALS:
-
         for i in range(0,G_DIMENTIONS):
             dim_random_events = random.sample(xrange(1,10),G_SIZE)
             arrivals.append(dim_random_events)            
             max_arr.append(max(dim_random_events))
 
-    else:      
+    else: 
         if G_POISS_PARAMETER is not None:
             # Single poisson parameter for all dimentions
             for i in range(0,G_DIMENTIONS):
-                numpy_arr = numpy.random.poisson(G_POISS_PARAMETER,G_SIZE)
+                numpy_arr = numpy.random.poisson(\
+                    (G_POISS_PARAMETER * G_SIMULATION_TIME) / 60.0\
+                    ,G_SIZE)
                 dim_poiss_events = numpy_arr.tolist()
                 arrivals.append(dim_poiss_events)
                 max_arr.append(max(dim_poiss_events))
@@ -567,10 +570,13 @@ def create_poisson_arrival():
         else:
             # A different poisson parameter for each dimetion
             for i in range(0,G_DIMENTIONS):
-                numpy_arr = numpy.random.poisson(G_POISS_ARRAY[i],G_SIZE)
+                numpy_arr = numpy.random.poisson(\
+                    (G_POISS_ARRAY[i] * G_SIMULATION_TIME) / 60.0\
+                    ,G_SIZE)
                 dim_poiss_events = numpy_arr.tolist()
                 arrivals.append(dim_poiss_events)
                 max_arr.append(max(dim_poiss_events))
+
 
     overall_max = max(max_arr)
     return (overall_max,arrivals)
@@ -579,7 +585,7 @@ def create_poisson_arrival():
 
 def generate_poisson_arrivals():
     arrivals = []
-    max_arr = [] 
+    max_arr = []
     global G_ARRIVALS
     for i in range(0,G_TESTCASES):
         tpl = create_poisson_arrival()
@@ -612,21 +618,29 @@ def generate_fixed_arrivals():
     return arrivals
     
 
-def generate_timestamps(size):
-
+def generate_timestamps(size,dim):
+    
     if G_POISS_PARAMETER != None:
-        numpy_arr = numpy.random.exponential\
-                    (G_SIMULATION_TIME / G_POISS_PARAMETER,size)        
-    elif G_POISS_ARRAY:
-        raise NotImplementedError
+        numpy_arr = numpy.random.exponential(\
+                    int(G_SIMULATION_TIME / \
+                        (( float(G_POISS_PARAMETER) * G_SIMULATION_TIME) / 60.0)) \
+                        ,size)
+
+    elif G_POISS_ARRAY != None:
+        numpy_arr = numpy.random.exponential(\
+                    int(G_SIMULATION_TIME / \
+                        (( float(G_POISS_ARRAY[dim]) * G_SIMULATION_TIME) / 60.0)) \
+                        ,size)
+
     else:
-        numpy_arr = numpy.random.exponential\
-                    (G_SIMULATION_TIME / G_ARRIVALS,size)
+        numpy_arr = numpy.random.exponential(\
+                    int(G_SIMULATION_TIME / float(G_ARRIVALS)), size)
+
+
     timestamp_intervals = numpy_arr.tolist()
     
     time_counter = 0.0
     timestamps = []
-
 
     for interval in timestamp_intervals:
         time_counter = time_counter + interval
@@ -699,7 +713,7 @@ def create_dataset(arrivals, splitter, testcase_num=None):
     dims = range(1,G_DIMENTIONS + 1)
     dim = dims.pop(0)
     result = []
-    intermediate_file_name = "{0}_intermediate_file".format(get_file_name())
+    intermediate_file_name = "{0}_intermediate_file".format(get_kossman_filename())
     intermediate_file = open(intermediate_file_name,'w')
     file_writer = intermediate_file_writer(result, intermediate_file)
 
@@ -712,7 +726,7 @@ def create_dataset(arrivals, splitter, testcase_num=None):
         for tuple_id in range(0,G_SIZE):
             values = kosmann_values.next()
             arr = tuple_arr.pop(0)
-            timestamps = generate_timestamps(arr)
+            timestamps = generate_timestamps(arr,dim)
 
             s = s + 1
             p = (s * 100) / t
@@ -721,9 +735,10 @@ def create_dataset(arrivals, splitter, testcase_num=None):
             for i in range(0,arr):
                 val = values.pop(0)
                 ts = timestamps.pop(0)
-                result.append((ts, tuple_id, dim, float(val),))
-                act_count += 1
-                file_writer.next()
+                if ts <= G_SIMULATION_TIME:
+                    result.append((ts, tuple_id, dim, float(val),))
+                    act_count += 1
+                    file_writer.next()
 
     print_verbose_message('\r done.\n')
     intermediate_file.close()
@@ -732,22 +747,28 @@ def create_dataset(arrivals, splitter, testcase_num=None):
     os.system("rm {0}".format(intermediate_file_name))
 
 def generate_datasets(arrival_arr):
-    splitter = KosmannSplitter(get_file_name(),MAX_INTERMEDIATE_FILE_SIZE_GB, G_VERBOSE)        
     if G_TESTCASES != 1:
         testcase = 0
         for arrival in arrival_arr:
+            splitter = KosmannSplitter(get_kossman_filename(),\
+                MAX_INTERMEDIATE_FILE_SIZE_GB, G_VERBOSE)
+            # randomize_file()
             create_dataset(arrival, splitter, testcase)
+            splitter.cleanup()
             testcase = testcase + 1
     else:
+        splitter = KosmannSplitter(get_kossman_filename(),\
+            MAX_INTERMEDIATE_FILE_SIZE_GB, G_VERBOSE)
+        # randomize_file()
         create_dataset(arrival_arr.pop(),splitter)
-    
+        splitter.cleanup()
+
     if G_DELETE_TMP:
         if G_RESUME is not None:
             os.system('rm {0}'.format(G_RESUME))
         else:
             os.system('rm tmp_{0}'.format(TIME))
 
-    splitter.cleanup()
         
 def main(argv):
     options = get_options(argv)
