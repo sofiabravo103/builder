@@ -2,12 +2,12 @@
 
 import os
 import sys
-import getopt 
-import random 
-import logging 
-import time 
-import numpy 
-import math 
+import getopt
+import random
+import logging
+import time
+import numpy
+import math
 import linecache
 import resource
 from kosmann_splitter import KosmannSplitter
@@ -16,59 +16,59 @@ from os.path import dirname, abspath
 TIME = time.time()
 GENERATOR = 'generador.cpp'
 MAX_ACTUALIZATIONS_LIST_SIZE = 5000
-MAX_KOSSMAN_DATA_LIST_SIZE = 1000 
+MAX_KOSSMAN_DATA_LIST_SIZE = 1000
 
 MAX_INTERMEDIATE_FILE_SIZE_GB = 5
 
-# Dataset will be generated with CONS_DATASET 
-# times the number of rows of the testcase  
+# Dataset will be generated with CONS_DATASET
+# times the number of rows of the testcase
 CONS_DATASET = 2
 
 help_text = '''Usage:
-builder [options] -o <outputfile> -s <size> -d <dimentions> 
+builder [options] -o <outputfile> -s <size> -d <dimentions>
 builder  -o <outputfile> --autodataset
 builder  -o <outputfile> --autotiny
 
 Options:
- -v                     verbose output 
+ -v                     verbose output
 
- --time                 specify the simulation time. Output may exceed this 
+ --time                 specify the simulation time. Output may exceed this
                         parameter. By default is a random number between 0 and
-                        1800. 
+                        1800.
 
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
-                        by default poisson distribution is used  
+                        by default poisson distribution is used
 
  --poissparameter <num> poisson parameter to use when generating arrival events.
                         The parameter specifies average arrival events per minute
                         (defaut is a random number between 1 and 10)
 
  --poissarray <string>  specify a string containg poisson parameters separated
-                        with an '%' (used when different poisson parameters 
-                        will be used to generate arrival events) 
+                        with an '%' (used when different poisson parameters
+                        will be used to generate arrival events)
                         example: --poissarray 5%2%10 for 3 dimentions.
 
- --testcases <num>      generate different testcases according to the same file  
+ --testcases <num>      generate different testcases according to the same file
 
- --leavereport          leave a report file describing the parameters used to 
-                        create the testcase(s) 
+ --leavereport          leave a report file describing the parameters used to
+                        create the testcase(s)
 
- --leavesettings <file> leave a report similar to that generated with 
+ --leavesettings <file> leave a report similar to that generated with
                         leavereport but adjusted to the Dynasty Algorithm input.
-                        The report will be appended to the file specified. 
+                        The report will be appended to the file specified.
 
  --expirations          specify when a value expires for each dimention. This
                         value will not affect testcases generation, but will be
-                        used for report and written to settings if 
+                        used for report and written to settings if
                         --leavesettings option is indicated. Input is a string
-                        containg expiration values separated with an '%'. 
+                        containg expiration values separated with an '%'.
                         example: --expirations 5%2%10 for 3 dimentions.
 
- --resume  <file>       resume execution from specified tmp file 
+ --resume  <file>       resume execution from specified tmp file
 
  --dontdelete           keep kossmann tmp file (default is delete the file)
 
- --autodataset          generate medium to small random parameters for the 
+ --autodataset          generate medium to small random parameters for the
                         entire dataset (to generate a quick and dirty dataset
                         for tests)
 
@@ -80,11 +80,11 @@ Options:
   --uniform             use uniform data distribution (default)
 
   --distributearr       data distribution refers to arrivals (default)
-  --distributedim       data distribution refers to dimentions 
+  --distributedim       data distribution refers to dimentions
 
   --rarrival            generate random arrival times, instead of exponential.
 '''
-            
+
 def print_verbose_message(msg):
     if G_VERBOSE:
         sys.stdout.write(msg)
@@ -114,7 +114,7 @@ def get_options(argv):
 
     try:
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
-        if not options:         
+        if not options:
             print help_text
             sys.exit(1)
     except getopt.GetoptError:
@@ -123,11 +123,11 @@ def get_options(argv):
     return options
 
 
-def check_dimentions(arg):    
+def check_dimentions(arg):
     if '.' in arg or '-' in arg:
         raise Exception('Error: dimention value (-d) value must be a positive'+\
                             'integer.')
-    try: 
+    try:
         d = int(arg)
     except ValueError:
         raise Exception('Error: dimention value (-d) is not a number')
@@ -139,7 +139,7 @@ def check_arrivals(arg):
     if '.' in arg or '-' in arg:
         raise Exception('Error: arrival value (-a) value must be a positive'+\
                             'integer.')
-    try: 
+    try:
         int(arg)
     except ValueError:
         raise Exception('Error: arrival value (-a) is not a number')
@@ -168,7 +168,7 @@ def check_num_parameter(arg,name,option):
     if '-' in arg or '.' in arg:
         raise Exception('Error: '+ name +' parameter(s) must be a positive '+\
                             'integer number')
-    try: 
+    try:
         f = int(arg)
     except ValueError:
         raise Exception('Error: '+ name +' parameter('+ option \
@@ -232,7 +232,6 @@ def check_auto(options):
             raise Exception('Error: options --autodataset or '+\
                             '--autotiny cannot be selected with '+\
                             'any other option')
-        
 
 def check_everything_set(auto, opt_list):
     if not auto:
@@ -306,7 +305,7 @@ def set_defaults():
     G_VERBOSE = False
     G_POISS_ARRAY = None
     G_LEAVE_REPORT = False
-    G_DATA_DIST_APPLICATION = 'arrivals'        
+    G_DATA_DIST_APPLICATION = 'arrivals'
     G_DATA_DIST = 'E'
     G_POISS_PARAMETER = random.randint(3,5)
     G_SIMULATION_TIME = random.randint(100,600)
@@ -321,10 +320,9 @@ def parse_probability_options(options):
     global G_POISS_PARAMETER
     global G_POISS_ARRAY
     global G_ARRIVALS
-    
 
-    for opt, arg in options: 
-        if opt == '--arrivals':  
+    for opt, arg in options:
+        if opt == '--arrivals':
             G_ARRIVALS = int(arg)
             G_POISS_PARAMETER = None
 
@@ -333,7 +331,7 @@ def parse_probability_options(options):
 
         elif opt == '--poissarray':
             G_POISS_PARAMETER = None
-            G_POISS_ARRAY = [int(x) for x in arg.split('%')]          
+            G_POISS_ARRAY = [int(x) for x in arg.split('%')]
 
         elif opt == '--rarrival':
             global G_RANDOM_ARRIVALS
@@ -342,15 +340,15 @@ def parse_probability_options(options):
 def parse_datadist_options(options):
     global G_DATA_DIST
 
-    for opt, arg in options:        
+    for opt, arg in options:
       if opt == '--anticorrelated':
-          raise NotImplementedError 
+          raise NotImplementedError
           G_DATA_DIST = 'A'
       elif opt == '--correlated':
-          raise NotImplementedError 
+          raise NotImplementedError
           G_DATA_DIST = 'C'
       elif opt == '--distributedim':
-          raise NotImplementedError 
+          raise NotImplementedError
           global G_DATA_DIST_APPLICATION
           G_DATA_DIST_APPLICATION = 'dimentions'
 
@@ -369,7 +367,6 @@ def set_autodataset_values():
     global G_SIZE
     global G_ARRIVALS
     global G_POISS_PARAMETER
-    
     G_POISS_PARAMETER = None
 
     if G_TINY:
@@ -378,15 +375,15 @@ def set_autodataset_values():
         min_size = 4
         max_size = 7
 
-        min_arr = 1
-        max_arr = 1
+        min_arr = 3
+        max_arr = 3
 
     else:
         max_dim = 5
 
         min_size = 10000
         max_size = 100000
-        
+
         min_arr = 30
         max_arr = 50
 
@@ -416,7 +413,7 @@ def parse_input(options):
     global G_VERBOSE
     global G_OUTPUTFILE
     global G_TESTCASES
-    global G_LEAVE_REPORT    
+    global G_LEAVE_REPORT
     global G_SETTINGS_FILE
     global G_EXPIRATIONS
     global G_RESUME
@@ -426,7 +423,7 @@ def parse_input(options):
     set_defaults()
 
     for opt, arg in options:
-        if opt == '-v':            
+        if opt == '-v':
             G_VERBOSE = True
         elif opt == '-o':
             G_OUTPUTFILE = arg
@@ -488,16 +485,16 @@ def report_settings():
                 if r_value == 'SIMULATION_TIME':
                     r_value = 'SIMULATION_SECONDS'
                 line = r_value + ':\t' + l_value
-                of_settings.write('D_' + line + '\n')        
-                
+                of_settings.write('D_' + line + '\n')
+
         of_settings.close()
 
 def report_input():
     if G_LEAVE_REPORT:
         of_report = open('{0}_report'.format(G_OUTPUTFILE),'w')
-                    
+
     if G_VERBOSE or G_LEAVE_REPORT:
-        print 'Generating dataset according to:'        
+        print 'Generating dataset according to:'
         for variable in globals():
             if'G_' in variable:
                 value = eval(variable)
@@ -521,8 +518,8 @@ def randomize_file():
     print_verbose_message(' done.\n')
 
 def call_kossman():
-    if G_RESUME is not None:        
-        return 
+    if G_RESUME is not None:
+        return
 
     if not os.path.isfile(GENERATOR):
         raise Exception('Error: kossman generator does exist')
@@ -548,7 +545,7 @@ def call_kossman():
     else:
         raise NotImplementedError
 
-def create_poisson_arrival():    
+def create_poisson_arrival():
     arrivals = []
     max_arr = []
 
@@ -558,7 +555,7 @@ def create_poisson_arrival():
             arrivals.append(dim_random_events)
             max_arr.append(max(dim_random_events))
 
-    else: 
+    else:
         if G_POISS_PARAMETER is not None:
             # Single poisson parameter for all dimentions
             for i in range(0,G_DIMENTIONS):
@@ -568,7 +565,7 @@ def create_poisson_arrival():
                 dim_poiss_events = numpy_arr.tolist()
                 arrivals.append(dim_poiss_events)
                 max_arr.append(max(dim_poiss_events))
-            
+
         else:
             # A different poisson parameter for each dimetion
             for i in range(0,G_DIMENTIONS):
@@ -596,10 +593,10 @@ def generate_poisson_arrivals():
 
     G_ARRIVALS = max(max_arr)
     return arrivals
-    
 
 
-def create_fixed_arrival():    
+
+def create_fixed_arrival():
     arrivals = []
 
     for i in range(0,G_DIMENTIONS):
@@ -613,15 +610,15 @@ def create_fixed_arrival():
 
 def generate_fixed_arrivals():
     arrivals = []
-    for i in range(0,G_TESTCASES):        
+    for i in range(0,G_TESTCASES):
         arr_list = create_fixed_arrival()
         arrivals.append(arr_list)
 
     return arrivals
-    
+
 
 def generate_timestamps(size,dim):
-    
+
     if G_POISS_PARAMETER != None:
         numpy_arr = numpy.random.exponential(\
                     int(G_SIMULATION_TIME / \
@@ -640,7 +637,7 @@ def generate_timestamps(size,dim):
 
 
     timestamp_intervals = numpy_arr.tolist()
-    
+
     time_counter = 0.0
     timestamps = []
 
@@ -659,16 +656,16 @@ def sort_file(intermediate_file_name):
     print_verbose_message(' done.\n')
 
     check_file_existence(sorted_intermediate_file_name, '')
-    return sorted_intermediate_file_name 
+    return sorted_intermediate_file_name
 
 
 def write_outputfile(intermediate_file_name, testcase_num, act_count):
     if testcase_num != None:
-        file_name = G_OUTPUTFILE + '_' + str(testcase_num)            
+        file_name = G_OUTPUTFILE + '_' + str(testcase_num)
     else:
         file_name = G_OUTPUTFILE
 
-    sorted_intermediate_file_name = sort_file(intermediate_file_name) 
+    sorted_intermediate_file_name = sort_file(intermediate_file_name)
 
     input_f = open(sorted_intermediate_file_name)
     output_f = open(file_name,'w')
@@ -678,7 +675,7 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
     acum = 0
     of_line = ''
     end_of_file_reached = False
-    
+
     while not end_of_file_reached:
         while line_counter < MAX_ACTUALIZATIONS_LIST_SIZE:
             try:
@@ -695,7 +692,7 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
         output_f.write(of_line + '\n')
         line_counter = 0
         of_line = ''
-    
+
     output_f.close()
     os.system('rm {0}'.format(sorted_intermediate_file_name))
     print_verbose_message('\r done.\n')
@@ -706,12 +703,12 @@ def intermediate_file_writer(result,intermediate_file):
 
         #To improve lines could be longer
         intermediate_file.write(str(tp)[1:] + "\n")
-        yield 
+        yield
 
 
 def create_dataset(arrivals, splitter, testcase_num=None):
     kosmann_values = splitter.values_generator()
-    tuples = G_SIZE   
+    tuples = G_SIZE
     dims = range(1,G_DIMENTIONS + 1)
     dim = dims.pop(0)
     result = []
@@ -719,11 +716,11 @@ def create_dataset(arrivals, splitter, testcase_num=None):
     intermediate_file = open(intermediate_file_name,'w')
     file_writer = intermediate_file_writer(result, intermediate_file)
 
-    print_verbose_message('Organizing dataset...\n')    
-    t = G_SIZE * G_DIMENTIONS 
+    print_verbose_message('Organizing dataset...\n')
+    t = G_SIZE * G_DIMENTIONS
     s = 0
     act_count = 0
-    for dim in range(0,G_DIMENTIONS):        
+    for dim in range(0,G_DIMENTIONS):
         tuple_arr = arrivals.pop(0)
         for tuple_id in range(0,G_SIZE):
             values = kosmann_values.next()
@@ -754,14 +751,14 @@ def generate_datasets(arrival_arr):
         for arrival in arrival_arr:
             splitter = KosmannSplitter(get_kossman_filename(),\
                 MAX_INTERMEDIATE_FILE_SIZE_GB, G_VERBOSE)
-            # randomize_file()
+            randomize_file()
             create_dataset(arrival, splitter, testcase)
             splitter.cleanup()
             testcase = testcase + 1
     else:
         splitter = KosmannSplitter(get_kossman_filename(),\
             MAX_INTERMEDIATE_FILE_SIZE_GB, G_VERBOSE)
-        # randomize_file()
+        randomize_file()
         create_dataset(arrival_arr.pop(),splitter)
         splitter.cleanup()
 
@@ -771,16 +768,15 @@ def generate_datasets(arrival_arr):
         else:
             os.system('rm tmp_{0}'.format(TIME))
 
-        
 def main(argv):
     options = get_options(argv)
     check_options(options)
     parse_input(options)
 
     if not G_ARRIVALS:
-        arrival_arr = generate_poisson_arrivals()    
+        arrival_arr = generate_poisson_arrivals()
     else:
-        arrival_arr = generate_fixed_arrivals()    
+        arrival_arr = generate_fixed_arrivals()
 
     if G_VERBOSE or G_LEAVE_REPORT or G_LEAVE_SETTINGS:
         report_input()
@@ -788,7 +784,7 @@ def main(argv):
 
     call_kossman()
 
-    generate_datasets(arrival_arr) 
+    generate_datasets(arrival_arr)
 
     if G_VERBOSE:
         print '\nEverything done!'
