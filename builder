@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 
 import os
 import sys
@@ -479,12 +479,12 @@ def report_settings():
                     l_value = "'"+ str(eval(variable)) +"_output'"
                     path_list = str(abspath(__file__)).split('/')[:-1]
                     path =  '/'.join(path_list)
-                    of_settings.write('D_INPUTFILE = '+ path + '/' + \
-                                      str(eval(variable)) + '\n')
+                    of_settings.write('D_INPUTFILE = "'+ path + '/' + \
+                                      str(eval(variable)) + '"\n')
 
                 if r_value == 'SIMULATION_TIME':
                     r_value = 'SIMULATION_SECONDS'
-                line = r_value + ':\t' + l_value
+                line = r_value + '\t=\t' + l_value
                 of_settings.write('D_' + line + '\n')
 
         of_settings.close()
