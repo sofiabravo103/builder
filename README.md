@@ -12,7 +12,7 @@ Generator of dynamic data following the structure of a sensor net. For the relat
 * Fedora:       
 ```sudo yum install python2.7```
 * Arch:         
-```sudo pacman install python2.7```
+```sudo pacman -S python2.7```
 
 #### Install pip through package manager ####
 * Ubuntu/Debian:      
