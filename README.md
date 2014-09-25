@@ -1,4 +1,4 @@
-# Skyline dynamic data generator 
+# Builder: a skyline dynamic data generator 
 
 **Version 2.0** currently it is only implemented to run in an **Unix** environment.
 
