@@ -36,12 +36,16 @@ Options:
                         parameter. By default is a random number between 0 and
                         1800.
 
+ --interval             interval of time in which poisson parameter is defined.
+                        example: --poissparameter 2 --interval 120 means 3
+                        arrivals every two minutes. Default is five minutes.
+
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
                         by default poisson distribution is used
 
  --poissparameter <num> poisson parameter to use when generating arrival events.
-                        The parameter specifies average arrival events per minute
-                        (defaut is a random number between 1 and 10)
+                        The parameter specifies average arrival events per time
+                        interval (defaut is a random number between 1 and 10)
 
  --poissarray <string>  specify a string containg poisson parameters separated
                         with an '%' (used when different poisson parameters
@@ -81,8 +85,6 @@ Options:
 
   --distributearr       data distribution refers to arrivals (default)
   --distributedim       data distribution refers to dimentions
-
-  --rarrival            generate random arrival times, instead of exponential.
 '''
 
 def print_verbose_message(msg):
@@ -101,7 +103,6 @@ def get_options(argv):
                      'leavereport', \
                      'distributearr', \
                      'distributedim', \
-                     'rarrival',\
                      'dontdelete',\
                      'poissarray=',\
                      'poissparameter=',\
@@ -110,6 +111,7 @@ def get_options(argv):
                      'leavesettings=', \
                      'resume=',\
                      'expirations=',\
+                     'interval=',
                      'time=']
 
     try:
@@ -241,7 +243,16 @@ def check_everything_set(auto, opt_list):
         if '-d' not in opt_list:
             raise Exception('Error: unless --autodataset or --autotiny are '+\
                                 'selected dimentions value (-d) must be specified')
-
+def check_interval(arg, options):
+    opt_list = [x for x,y in options]
+    if '--time' not in opt_list:
+        raise Exception('Error: in order to use --interval the option '+\
+            '--time must be set')
+    else: 
+       for opt, val in options:
+           if opt == '--time' and val < arg:
+               raise Exception('Error: interval value must be smaller '+\
+                'than simulation time value')
 
 def check_options(options):
     auto = False
@@ -271,6 +282,10 @@ def check_options(options):
         elif opt == '--poissarray':
             check_poiss_array(arg,options)
             check_not_arrivals(options)
+        elif opt == '--interval':
+            check_num_parameter(arg,'interval',opt)
+            check_not_arrivals(options)
+            check_interval(arg, options)
         elif opt == '--arrrivals':
             check_arrivals(arg)
         elif opt == '--autodataset' or opt == '--autotiny':
@@ -286,7 +301,6 @@ def set_defaults():
     global G_ARRIVALS
     global G_AUTO
     global G_TINY
-    global G_RANDOM_ARRIVALS
     global G_TESTCASES
     global G_LEAVE_REPORT
     global G_SETTINGS_FILE
@@ -297,6 +311,7 @@ def set_defaults():
     global G_POISS_ARRAY
     global G_EXPIRATIONS
     global G_LEAVE_SETTINGS
+    global G_INTERVAL
 
     G_LEAVE_SETTINGS  = None
     G_SETTINGS_FILE = None
@@ -307,13 +322,13 @@ def set_defaults():
     G_LEAVE_REPORT = False
     G_DATA_DIST_APPLICATION = 'arrivals'
     G_DATA_DIST = 'E'
-    G_POISS_PARAMETER = random.randint(3,5)
+    G_POISS_PARAMETER = random.randint(2,5)
+    G_INTERVAL = 300
     G_SIMULATION_TIME = random.randint(100,600)
     G_ARRIVALS = None
     G_TESTCASES = 1
     G_AUTO = False
     G_TINY = False
-    G_RANDOM_ARRIVALS = False
     G_EXPIRATIONS = []
 
 def parse_probability_options(options):
@@ -333,9 +348,8 @@ def parse_probability_options(options):
             G_POISS_PARAMETER = None
             G_POISS_ARRAY = [int(x) for x in arg.split('%')]
 
-        elif opt == '--rarrival':
-            global G_RANDOM_ARRIVALS
-            G_RANDOM_ARRIVALS = True
+        elif opt == '--interval':
+            G_INTERVAL = int(arg)
 
 def parse_datadist_options(options):
     global G_DATA_DIST
@@ -375,8 +389,8 @@ def set_autodataset_values():
         min_size = 4
         max_size = 7
 
-        min_arr = 3
-        max_arr = 3
+        min_arr = 2
+        max_arr = 2
 
     else:
         max_dim = 5
@@ -384,13 +398,12 @@ def set_autodataset_values():
         min_size = 10000
         max_size = 100000
 
-        min_arr = 30
-        max_arr = 50
+        min_arr = 2
+        max_arr = 5
 
     G_DIMENTIONS = random.randint(3,max_dim)
     G_SIZE = random.randint(min_size,max_size)
-    G_ARRIVALS = random.randint(min_arr,max_arr)
-
+    G_ARRIVALS = (random.randint(min_arr,max_arr) * G_TIME) / 300
 
 def parse_auto(options):
     global G_AUTO
@@ -455,7 +468,7 @@ def report_settings():
         ommited = [\
                    'TESTCASES','POISS_ARRAY', 'VERBOSE','RESUME','ARRIVALS',\
                    'SETTINGS_FILE', 'DATA_DIST_APPLICATION','DATA_DIST',
-                   'RANDOM_ARRIVALS','POISS_PARAMETER','TINY','DELETE_TMP',
+                   'LEAVE_SETTINGS','POISS_PARAMETER','TINY','DELETE_TMP',
                    'LEAVE_REPORT','AUTO']
 
         for variable in globals():
@@ -518,6 +531,7 @@ def randomize_file():
     print_verbose_message(' done.\n')
 
 def call_kossman():
+    global G_ARRIVALS
     if G_RESUME is not None:
         return
 
@@ -532,6 +546,10 @@ def call_kossman():
             size = G_SIZE * G_DIMENTIONS * CONS_DATASET
         else:
             size = G_DIMENTIONS * G_SIZE
+
+        if G_ARRIVALS <= 1:
+            G_ARRIVALS = 2
+
         dimentions = G_ARRIVALS
 
         print_verbose_message('Creating tmp file with Kossmann generator...')
@@ -549,32 +567,25 @@ def create_poisson_arrival():
     arrivals = []
     max_arr = []
 
-    if G_RANDOM_ARRIVALS:
+    if G_POISS_PARAMETER is not None:
+            # Single poisson parameter for all dimentions
         for i in range(0,G_DIMENTIONS):
-            dim_random_events = random.sample(xrange(30,50),G_SIZE)
-            arrivals.append(dim_random_events)
-            max_arr.append(max(dim_random_events))
+            numpy_arr = numpy.random.poisson(\
+                (G_POISS_PARAMETER * G_SIMULATION_TIME) / float(G_INTERVAL)\
+                ,G_SIZE)
+            dim_poiss_events = numpy_arr.tolist()
+            arrivals.append(dim_poiss_events)
+            max_arr.append(max(dim_poiss_events))
 
     else:
-        if G_POISS_PARAMETER is not None:
-            # Single poisson parameter for all dimentions
-            for i in range(0,G_DIMENTIONS):
-                numpy_arr = numpy.random.poisson(\
-                    (G_POISS_PARAMETER * G_SIMULATION_TIME) / 60.0\
-                    ,G_SIZE)
-                dim_poiss_events = numpy_arr.tolist()
-                arrivals.append(dim_poiss_events)
-                max_arr.append(max(dim_poiss_events))
-
-        else:
             # A different poisson parameter for each dimetion
-            for i in range(0,G_DIMENTIONS):
-                numpy_arr = numpy.random.poisson(\
-                    (G_POISS_ARRAY[i] * G_SIMULATION_TIME) / 60.0\
-                    ,G_SIZE)
-                dim_poiss_events = numpy_arr.tolist()
-                arrivals.append(dim_poiss_events)
-                max_arr.append(max(dim_poiss_events))
+        for i in range(0,G_DIMENTIONS):
+            numpy_arr = numpy.random.poisson(\
+                (G_POISS_ARRAY[i] * G_SIMULATION_TIME) / float(G_INTERVAL)\
+                ,G_SIZE)
+            dim_poiss_events = numpy_arr.tolist()
+            arrivals.append(dim_poiss_events)
+            max_arr.append(max(dim_poiss_events))
 
 
     overall_max = max(max_arr)
@@ -622,16 +633,18 @@ def generate_timestamps(size,dim):
     if G_POISS_PARAMETER != None:
         numpy_arr = numpy.random.exponential(\
                     int(G_SIMULATION_TIME / \
-                        (( float(G_POISS_PARAMETER) * G_SIMULATION_TIME) / 60.0)) \
+                        (( float(G_POISS_PARAMETER) * G_SIMULATION_TIME) / G_INTERVAL)) \
                         ,size)
 
     elif G_POISS_ARRAY != None:
         numpy_arr = numpy.random.exponential(\
                     int(G_SIMULATION_TIME / \
-                        (( float(G_POISS_ARRAY[dim]) * G_SIMULATION_TIME) / 60.0)) \
+                        (( float(G_POISS_ARRAY[dim]) * G_SIMULATION_TIME) / G_INTERVAL)) \
                         ,size)
 
     else:
+        if G_ARRIVALS <= 1:
+            G_ARRIVALS = 2
         numpy_arr = numpy.random.exponential(\
                     int(G_SIMULATION_TIME / float(G_ARRIVALS)), size)
 
