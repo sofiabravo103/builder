@@ -1,6 +1,6 @@
 # Builder: a dynamic data generator for skyline querys 
 
-**Version 2.0** currently it is only implemented to run in an **Unix** environment.
+Builder is currently implemented to run only in an **Unix-like** environment.
 
 Generator of dynamic data following the structure of a sensor net. For the relations between the data Kossman skyline generator was used.
 
