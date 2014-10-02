@@ -67,7 +67,7 @@ builder  -o <outputfile> --autotiny
 ```resume  <file>```       | resume execution from specified tmp file
 ```dontdelete```           | keep kossmann tmp file (default is delete the file)
 ```autodataset```          | generate medium to small random parameters for the entire dataset (to generate a quick and dirty dataset for tests)
-```autotiny```             | like --autodataset but generating a tiny dataset (to generate a quick and dirty tiny dataset for control)
+```autotiny```             | like --autodataset but generating a tiny dataset (to generate a quick tiny dataset for control)
 ```anticorrelated```       | use anticorrelated data distribution
 ```correlated```           | use correlated data distribution
 ```uniform```              | use uniform data distribution (default)
