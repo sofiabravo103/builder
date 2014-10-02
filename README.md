@@ -12,7 +12,7 @@ Generator of dynamic data following the structure of a sensor net. For the relat
 * Fedora:       
 ```sudo yum install python2.7```
 * Arch:         
-```sudo pacman -S python2.7```
+```sudo pacman -S python2```
 
 #### Install pip through package manager ####
 * Ubuntu/Debian:      
@@ -20,7 +20,7 @@ Generator of dynamic data following the structure of a sensor net. For the relat
 * Fedora:      
 ```sudo yum install python-pip```
 * Arch:       
-```sudo pacman install python-pip```
+```sudo pacman -S python2-pip```
 
 #### Python dependencies ####
 * numpy      
