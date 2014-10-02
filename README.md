@@ -27,6 +27,9 @@ Generator of dynamic data following the structure of a sensor net. For the relat
 ```pip install numpy```
 * python resources <https://pypi.python.org/pypi/python-resources/0.3>
 
+#### Unix dependencies ####
+* sort
+* split
 ## Usage ##
 
 ### General options ###
