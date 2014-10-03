@@ -1,0 +1,66 @@
+import unittest, os, sys, ast
+from os.path import dirname, abspath, basename
+sys.path.append(dirname(dirname(abspath(__file__))))
+from builder import main as builder
+
+class TestBuilder(unittest.TestCase):
+  @staticmethod
+  def call_builder(parameters):
+    builder(parameters)
+
+  def test_arrivals(self):
+    ''' it should generate the correct ammount of fixed arrivals'''
+    test_name = 'test_arrivals'
+    arrivals = 1
+    tuples = 10000
+    self.call_builder(['-s', str(tuples) ,'-d','3','--arrivals', arrivals, '-o', test_name])
+    ids_dim_count = {}
+    for id in range(0,tuples):
+      ids_dim_count[id] = [0, 0, 0]
+
+    test_file = open(test_name)
+    for tupl_str in test_file:
+      tupl = ast.literal_eval(tupl_str)
+      id = tupl[1]
+      dim = tupl[2]
+
+      ids_dim_count[id][dim] += 1
+
+    for id in range(0,tuples):
+      for dim in range(0,3):
+        self.assertTrue(ids_dim_count[id][dim] <= arrivals)
+
+    os.system('rm ' + test_name)
+
+  def test_poisson(self):
+    '''it should generate the correct amount of poisson arrivals'''
+    test_name = 'test_poisson'
+    poissparameter = 1
+    tuples = 10000
+    self.call_builder(['-s', str(tuples) ,'-d','3','--poissparameter', \
+      str(poissparameter), '-o', test_name, '--time', '650', \
+      '--interval', '650'])
+    ids_dim_count = {}
+    for id in range(0,tuples):
+      ids_dim_count[id] = [0, 0, 0]
+
+    test_file = open(test_name)
+    for tupl_str in test_file:
+      tupl = ast.literal_eval(tupl_str)
+      id = tupl[1]
+      dim = tupl[2]
+
+      ids_dim_count[id][dim] += 1
+
+    for dim in range(0,3):
+      sum =  0
+      for id in range(0,tuples):
+        sum += ids_dim_count[id][dim]
+
+      prom = int(round(sum / float(tuples),0))
+      self.assertTrue(prom <= 1)
+
+    os.system('rm ' + test_name)
+
+if __name__ == '__main__':
+  unittest.main()
