@@ -258,7 +258,7 @@ def check_interval(arg, options):
     if '--time' not in opt_list:
         raise Exception('Error: in order to use --interval the option '+\
             '--time must be set')
-    else: 
+    else:
        for opt, val in options:
            if opt == '--time' and val < arg:
                raise Exception('Error: interval value must be smaller '+\
@@ -715,8 +715,10 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
             acum += 1
         p = (acum * 100) / act_count
         print_verbose_message('\r{0}%'.format(p))
-
-        output_f.write(of_line + '\n')
+        if end_of_file_reached:
+            output_f.write(of_line[:-3])
+        else:
+            output_f.write(of_line[:-2] + '\n')
         line_counter = 0
         of_line = ''
 
