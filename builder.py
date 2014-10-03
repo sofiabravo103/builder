@@ -15,7 +15,7 @@ from os.path import dirname, abspath
 
 TIME = time.time()
 GENERATOR = 'generador.cpp'
-MAX_ACTUALIZATIONS_LIST_SIZE = 5000
+MAX_ACTUALIZATIONS_LIST_SIZE = 1
 MAX_KOSSMAN_DATA_LIST_SIZE = 1000
 
 MAX_INTERMEDIATE_FILE_SIZE_GB = 5
@@ -86,6 +86,9 @@ Options:
   --distributearr       data distribution refers to arrivals (default)
   --distributedim       data distribution refers to dimentions
 '''
+def get_path(filename):
+    return dirname(abspath(__file__)) + '/' + filename
+
 
 def print_verbose_message(msg):
     if G_VERBOSE:
@@ -148,16 +151,23 @@ def check_arrivals(arg):
 
 
 def check_outputfile(arg):
-    if os.path.isfile(arg) or os.path.isfile(arg + '_0'):
+    if os.path.isfile(get_path(arg)) or os.path.isfile(get_path(arg) + '_0'):
         ans = raw_input('Warning: file "{0}" exists, continue? [Y/n]: '.format(arg))
         while not (ans == 'y' or ans == 'n' or ans == ''):
             ans = raw_input("Please type 'y' or 'n': ")
         if ans == 'n':
             sys.exit()
 
-def check_file_existence(arg, name):
-    if not os.path.isfile(arg):
-        raise Exception('Error: '+ name +' file {0} does not exist'.format(arg))
+def check_file_existence(arg, name, path_included=False):
+    if arg[0] == '.':
+            print('WARNING: Non absolute paths are not supported. Check that settings '+\
+                'file was created in the correct location.')
+    if not path_included:
+        if not os.path.isfile(get_path(arg)):
+            raise Exception('Error: '+ name +' file {0} does not exist'.format(get_path(arg)))
+    else:
+        if not os.path.isfile(arg):
+            raise Exception('Error: '+ name +' file {0} does not exist'.format(arg))
 
 
 def check_not_arrivals(options):
@@ -269,7 +279,7 @@ def check_options(options):
         elif opt == '--expirations':
             check_expirations_array(arg,options)
         elif opt == '--leavesettings':
-            check_file_existence(arg, 'settings')
+            check_file_existence(arg, 'settings', path_included=True)
         elif opt == '--time':
             check_num_parameter(arg,'simulation time',opt)
         elif opt == '--resume':
@@ -284,7 +294,6 @@ def check_options(options):
             check_not_arrivals(options)
         elif opt == '--interval':
             check_num_parameter(arg,'interval',opt)
-            check_not_arrivals(options)
             check_interval(arg, options)
         elif opt == '--arrrivals':
             check_arrivals(arg)
@@ -335,6 +344,7 @@ def parse_probability_options(options):
     global G_POISS_PARAMETER
     global G_POISS_ARRAY
     global G_ARRIVALS
+    global G_INTERVAL
 
     for opt, arg in options:
         if opt == '--arrivals':
@@ -403,7 +413,7 @@ def set_autodataset_values():
 
     G_DIMENTIONS = random.randint(3,max_dim)
     G_SIZE = random.randint(min_size,max_size)
-    G_ARRIVALS = (random.randint(min_arr,max_arr) * G_TIME) / 300
+    G_ARRIVALS = (random.randint(min_arr,max_arr) * G_SIMULATION_TIME) / G_INTERVAL
 
 def parse_auto(options):
     global G_AUTO
@@ -421,6 +431,13 @@ def parse_auto(options):
             set_autodataset_values()
     return G_AUTO
 
+def set_expirations_default():
+    global G_EXPIRATIONS
+    if G_EXPIRATIONS == []:
+        G_EXPIRATIONS = [random.randint(int(G_SIMULATION_TIME * 0.2)\
+            ,int(G_SIMULATION_TIME * 0.6))\
+        for x in range(0,G_DIMENTIONS)]
+
 
 def parse_input(options):
     global G_VERBOSE
@@ -428,7 +445,6 @@ def parse_input(options):
     global G_TESTCASES
     global G_LEAVE_REPORT
     global G_SETTINGS_FILE
-    global G_EXPIRATIONS
     global G_RESUME
     global G_DELETE_TMP
     global G_SIMULATION_TIME
@@ -446,6 +462,7 @@ def parse_input(options):
             G_LEAVE_REPORT = True
         elif opt == '--leavesettings':
             G_SETTINGS_FILE = arg
+            G_LEAVE_SETTINGS = True
         elif opt == '--expirations':
             G_EXPIRATIONS = [int(x) for x in arg.split('%')]
         elif opt == '--resume':
@@ -460,6 +477,7 @@ def parse_input(options):
         parse_datadist_options(options)
         parse_probability_options(options)
 
+    set_expirations_default()
 
 def report_settings():
     if G_SETTINGS_FILE is not None:
@@ -484,14 +502,10 @@ def report_settings():
 
                 if r_value == 'EXPIRATIONS':
                     r_value = 'EXPIRATION_TIMES'
-                    if l_value == '[]':
-                        l_value = str([random.randint(1,G_ARRIVALS)\
-                                   for x in range(0,G_DIMENTIONS)])
 
                 if r_value == 'OUTPUTFILE':
                     l_value = "'"+ str(eval(variable)) +"_output'"
-                    path_list = str(abspath(__file__)).split('/')[:-1]
-                    path =  '/'.join(path_list)
+                    path = str(abspath('.'))
                     of_settings.write('D_INPUTFILE = "'+ path + '/' + \
                                       str(eval(variable)) + '"\n')
 
@@ -504,7 +518,7 @@ def report_settings():
 
 def report_input():
     if G_LEAVE_REPORT:
-        of_report = open('{0}_report'.format(G_OUTPUTFILE),'w')
+        of_report = open('{0}_report'.format(get_path(G_OUTPUTFILE)),'w')
 
     if G_VERBOSE or G_LEAVE_REPORT:
         print 'Generating dataset according to:'
@@ -520,9 +534,9 @@ def report_input():
 
 def get_kossman_filename():
     if G_RESUME is not None:
-        return '{0}'.format(G_RESUME)
+        return get_path('{0}'.format(G_RESUME))
     else:
-        return 'tmp_{0}'.format(TIME)
+        return get_path('tmp_{0}'.format(TIME))
 
 def randomize_file():
     print_verbose_message('Randomizing kossman file...')
@@ -531,15 +545,14 @@ def randomize_file():
     print_verbose_message(' done.\n')
 
 def call_kossman():
-    global G_ARRIVALS
     if G_RESUME is not None:
         return
 
-    if not os.path.isfile(GENERATOR):
+    if not os.path.isfile(get_path(GENERATOR)):
         raise Exception('Error: kossman generator does exist')
 
-    if not os.path.isfile('generador'):
-        os.system('g++ {0} -o generator'.format(GENERATOR))
+    if not os.path.isfile(get_path('generador')):
+        os.system('g++ {0} -o {1}'.format(get_path(GENERATOR),get_path('generator')))
 
     if G_DATA_DIST_APPLICATION == 'arrivals':
         if G_TESTCASES > 1:
@@ -547,17 +560,18 @@ def call_kossman():
         else:
             size = G_DIMENTIONS * G_SIZE
 
-        if G_ARRIVALS <= 1:
-            G_ARRIVALS = 2
-
         dimentions = G_ARRIVALS
+        if dimentions <= 1:
+            dimentions = 2
 
         print_verbose_message('Creating tmp file with Kossmann generator...')
-        os.system('./generator {0} {1} {2} tmp_{3}_notail > /dev/null'.format(\
-            dimentions, G_DATA_DIST,size,TIME))
-        os.system('tail -n +2 tmp_{0}_notail > {1}'.format(TIME,\
+        os.system('{0} {1} {2} {3} {4} > /dev/null'.format(\
+            get_path('generator'), dimentions, G_DATA_DIST,size,
+            get_path('tmp_{0}_notail'.format(TIME))))
+        os.system('tail -n +2 {0} > {1}'.format(\
+            get_path('tmp_{0}_notail'.format(TIME)),\
             get_kossman_filename()))
-        os.system('rm tmp_{0}_notail'.format(TIME))
+        os.system('rm {0}'.format(get_path('tmp_{0}_notail'.format(TIME))))
         print_verbose_message(' done.\n')
 
     else:
@@ -643,8 +657,6 @@ def generate_timestamps(size,dim):
                         ,size)
 
     else:
-        if G_ARRIVALS <= 1:
-            G_ARRIVALS = 2
         numpy_arr = numpy.random.exponential(\
                     int(G_SIMULATION_TIME / float(G_ARRIVALS)), size)
 
@@ -661,14 +673,16 @@ def generate_timestamps(size,dim):
     return timestamps
 
 def sort_file(intermediate_file_name):
-    sorted_intermediate_file_name = intermediate_file_name + '_sorted'
+    sorted_intermediate_file_name = intermediate_file_name +'_sorted'
+
 
     print_verbose_message('Sorting dataset...')
     os.system('sort -T . -g {0} -o {1}'.format(intermediate_file_name, \
         sorted_intermediate_file_name))
     print_verbose_message(' done.\n')
 
-    check_file_existence(sorted_intermediate_file_name, '')
+    check_file_existence(sorted_intermediate_file_name,'sorted tmp file',path_included=True)
+
     return sorted_intermediate_file_name
 
 
@@ -776,10 +790,8 @@ def generate_datasets(arrival_arr):
         splitter.cleanup()
 
     if G_DELETE_TMP:
-        if G_RESUME is not None:
-            os.system('rm {0}'.format(G_RESUME))
-        else:
-            os.system('rm tmp_{0}'.format(TIME))
+            os.system('rm {0}'.format(get_kossman_filename()))
+
 
 def main(argv):
     options = get_options(argv)

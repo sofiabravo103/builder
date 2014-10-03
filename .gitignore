@@ -3,3 +3,5 @@
 generator
 *.sh
 *.out
+tmp*
+*_report
