@@ -735,7 +735,7 @@ def join_tuple_events(unmerged_file_name, act_count):
     init_join_data(join_data)
 
     for tupl_str in unmerged_file:
-        perc = (perc_acum * 100.0) / perc_total
+        perc = (perc_acum * 100) / perc_total
         print_verbose_message('\r{0}%'.format(perc))
 
         tupl = eval('(' + tupl_str)
@@ -752,6 +752,7 @@ def join_tuple_events(unmerged_file_name, act_count):
             else:
                 ready_tuple[i+2] = join_data[id_t]['current_event']['values'][i]
 
+        perc_acum += 1
         if cont:
             continue
 
@@ -762,17 +763,13 @@ def join_tuple_events(unmerged_file_name, act_count):
 
         join_data[id_t]['current_event'] = {'ts' : None, 'values' : dims_init()}
 
-
     unmerged_file.close()
-    perc_acum += 1
+
 
     merged_file.close()
-    sorted_merged_file_name = sort_file(merged_file_name)
     print_verbose_message('\r done\n')
     os.system('rm {0}'.format(unmerged_file_name))
-    os.system('rm {0}'.format(merged_file_name))
-
-    return sorted_merged_file_name
+    return merged_file_name
 
 def write_outputfile(intermediate_file_name, testcase_num, act_count):
     if testcase_num != None:
