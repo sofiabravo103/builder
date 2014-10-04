@@ -1,4 +1,4 @@
-# Builder: a dynamic data generator for skyline querys 
+# Builder: a dynamic data generator for skyline querys
 
 Builder is currently implemented to run only in an **Unix-like** environment.
 
@@ -7,23 +7,23 @@ Generator of dynamic data following the structure of a sensor net. For the relat
 ## Set up ##
 
 #### Install python 2.7 ####
-* Ubuntu/Debian:       
+* Ubuntu/Debian:
 ```sudo apt-get install python2.7```
-* Fedora:       
+* Fedora:
 ```sudo yum install python2.7```
-* Arch:         
+* Arch:
 ```sudo pacman -S python2```
 
 #### Install pip through package manager ####
-* Ubuntu/Debian:      
+* Ubuntu/Debian:
 ```sudo apt-get install python-pip```
-* Fedora:      
+* Fedora:
 ```sudo yum install python-pip```
-* Arch:       
+* Arch:
 ```sudo pacman -S python2-pip```
 
 #### Python dependencies ####
-* numpy      
+* numpy
 ```pip install numpy```
 * python resources <https://pypi.python.org/pypi/python-resources/0.3>
 
@@ -37,7 +37,7 @@ Generator of dynamic data following the structure of a sensor net. For the relat
 
 For getting a specific dataset:
 ~~~~~
-builder [options] -o <outputfile> -s <size> -d <dimentions> 
+builder [options] -o <outputfile> -s <size> -d <dimentions>
 ~~~~~
 
 For getting a dataset randomly generated:
@@ -73,6 +73,9 @@ builder  -o <outputfile> --autotiny
 ```uniform```              | use uniform data distribution (default)
 ```distributearr```        | data distribution refers to arrivals (default)
 ```distributedim```        | data distribution refers to dimentions 
+```events_per_line```      | in some cases it is better to have many events per line to memory per each disk reading. To adjust to just one event per line set this to 1. By default 5000 events per line are used.
+```independentdims```      | if specified dimentions will have actualizations indepently, by default all dimentions arrive in a single event.
+
 
 ## Contributors ##
 
