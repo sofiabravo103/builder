@@ -15,9 +15,7 @@ from os.path import dirname, abspath
 
 TIME = time.time()
 GENERATOR = 'generador.cpp'
-MAX_ACTUALIZATIONS_LIST_SIZE = 1
 MAX_KOSSMAN_DATA_LIST_SIZE = 1000
-
 MAX_INTERMEDIATE_FILE_SIZE_GB = 5
 
 # Dataset will be generated with CONS_DATASET
@@ -85,6 +83,12 @@ Options:
 
   --distributearr       data distribution refers to arrivals (default)
   --distributedim       data distribution refers to dimentions
+
+  --events_per_line     in some cases it is better to have many events per line
+                        rather then just one. That way many events can be written
+                        to memory per each disk reading. To adjust to just one event
+                        per line set this to 1. By default 5000 events per line
+                        are used.
 '''
 def get_path(filename):
     return dirname(abspath(__file__)) + '/' + filename
@@ -115,7 +119,8 @@ def get_options(argv):
                      'resume=',\
                      'expirations=',\
                      'interval=',
-                     'time=']
+                     'time=',\
+                     'events_per_line=']
 
     try:
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
@@ -225,6 +230,9 @@ def check_auto(options):
         if '-v' in opt_list:
             counter = counter - 1
 
+        if '--events_per_line' in opt_list:
+            counter = counter - 1
+
         if '--testcases' in opt_list:
             counter = counter - 1
 
@@ -295,6 +303,8 @@ def check_options(options):
         elif opt == '--interval':
             check_num_parameter(arg,'interval',opt)
             check_interval(arg, options)
+        elif opt == '--events_per_line':
+            check_num_parameter(arg,'events per line',opt)
         elif opt == '--arrrivals':
             check_arrivals(arg)
         elif opt == '--autodataset' or opt == '--autotiny':
@@ -321,6 +331,9 @@ def set_defaults():
     global G_EXPIRATIONS
     global G_LEAVE_SETTINGS
     global G_INTERVAL
+    global MAX_ACTUALIZATIONS_LIST_SIZE
+
+    MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 
     G_LEAVE_SETTINGS  = None
     G_SETTINGS_FILE = None
@@ -448,6 +461,7 @@ def parse_input(options):
     global G_RESUME
     global G_DELETE_TMP
     global G_SIMULATION_TIME
+    global MAX_ACTUALIZATIONS_LIST_SIZE
 
     set_defaults()
 
@@ -465,6 +479,8 @@ def parse_input(options):
             G_LEAVE_SETTINGS = True
         elif opt == '--expirations':
             G_EXPIRATIONS = [int(x) for x in arg.split('%')]
+        elif opt == '--events_per_line':
+            MAX_ACTUALIZATIONS_LIST_SIZE = int(arg)
         elif opt == '--resume':
             G_RESUME = arg
         elif opt == '--dontdelete':
@@ -716,7 +732,7 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
         p = (acum * 100) / act_count
         print_verbose_message('\r{0}%'.format(p))
         if end_of_file_reached:
-            output_f.write(of_line[:-3])
+            output_f.write(of_line[:-2])
         else:
             output_f.write(of_line[:-2] + '\n')
         line_counter = 0
