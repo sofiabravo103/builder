@@ -89,6 +89,9 @@ Options:
                         to memory per each disk reading. To adjust to just one event
                         per line set this to 1. By default 5000 events per line
                         are used.
+
+--independentdims      if specified dimentions will have actualizations indepently,
+                       by default all dimentions arrive in a single event.
 '''
 def get_path(filename):
     return dirname(abspath(__file__)) + '/' + filename
@@ -111,6 +114,7 @@ def get_options(argv):
                      'distributearr', \
                      'distributedim', \
                      'dontdelete',\
+                     'independentdims',\
                      'poissarray=',\
                      'poissparameter=',\
                      'arrivals=',\
@@ -331,10 +335,12 @@ def set_defaults():
     global G_EXPIRATIONS
     global G_LEAVE_SETTINGS
     global G_INTERVAL
+    global G_INDEPENDENT_DIMS
     global MAX_ACTUALIZATIONS_LIST_SIZE
 
     MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 
+    G_INDEPENDENT_DIMS = False
     G_LEAVE_SETTINGS  = None
     G_SETTINGS_FILE = None
     G_RESUME = None
@@ -461,6 +467,7 @@ def parse_input(options):
     global G_RESUME
     global G_DELETE_TMP
     global G_SIMULATION_TIME
+    global G_INDEPENDENT_DIMS
     global MAX_ACTUALIZATIONS_LIST_SIZE
 
     set_defaults()
@@ -487,6 +494,8 @@ def parse_input(options):
             G_DELETE_TMP = False
         elif opt == '--time':
             G_SIMULATION_TIME = float(arg)
+        elif opt == '--independentdims':
+            G_INDEPENDENT_DIMS = True
 
     if not parse_auto(options):
         parse_short_options(options)
@@ -692,15 +701,73 @@ def sort_file(intermediate_file_name):
     sorted_intermediate_file_name = intermediate_file_name +'_sorted'
 
 
-    print_verbose_message('Sorting dataset...')
+
     os.system('sort -T . -g {0} -o {1}'.format(intermediate_file_name, \
         sorted_intermediate_file_name))
-    print_verbose_message(' done.\n')
 
     check_file_existence(sorted_intermediate_file_name,'sorted tmp file',path_included=True)
 
     return sorted_intermediate_file_name
 
+def dims_init():
+    dims = {}
+    for i in range(0,G_DIMENTIONS):
+        dims[i] = None
+    return dims
+
+
+def join_tuple_events(unmerged_file_name):
+    print_verbose_message('Joining tuples into single events...\n')
+    merged_file_name = get_kossman_filename() + '_merged'
+    merged_file = open(merged_file_name,'w')
+    perc_acum = 0
+    perc_total = G_SIZE
+    perc = 0
+    for id in range(0,G_SIZE):
+        perc = (perc_acum * 100.0) / perc_total
+        print_verbose_message('\r{0}%'.format(perc))
+        unmerged_file = open(unmerged_file_name)
+        ready_set = []
+        ready_tuple = {}
+        current_event = {'ts' : None, 'values' : dims_init()}
+        for tupl_str in unmerged_file:
+            tupl = eval('(' + tupl_str)
+            ts_t, id_t, dim_t, val_t = tupl
+
+            if id != id_t:
+                continue
+
+            current_event['values'][dim_t] = val_t
+
+            cont = False
+            for i in range(0,G_DIMENTIONS):
+                if current_event['values'][i] == None:
+                    cont = True
+                    break
+                else:
+                    ready_tuple[i+1] = current_event['values'][i]
+
+            if cont:
+                continue
+
+            ready_tuple[0] = ts_t
+            ready_set.append(tuple(ready_tuple.values()))
+            ready_tuple = {}
+            current_event = {'ts' : None, 'values' : dims_init()}
+
+        for tuple_event in ready_set:
+            merged_file.write(str(tuple_event)[1:] + '\n')
+
+        unmerged_file.close()
+        perc_acum += 1
+
+    merged_file.close()
+    sorted_merged_file_name = sort_file(merged_file_name)
+    print_verbose_message('\r done\n')
+    os.system('rm {0}'.format(unmerged_file_name))
+    os.system('rm {0}'.format(merged_file_name))
+
+    return sorted_merged_file_name
 
 def write_outputfile(intermediate_file_name, testcase_num, act_count):
     if testcase_num != None:
@@ -708,7 +775,13 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
     else:
         file_name = G_OUTPUTFILE
 
+    print_verbose_message('Sorting dataset...')
     sorted_intermediate_file_name = sort_file(intermediate_file_name)
+    print_verbose_message(' done.\n')
+
+    if not G_INDEPENDENT_DIMS:
+        sorted_intermediate_file_name = \
+        join_tuple_events(sorted_intermediate_file_name)
 
     input_f = open(sorted_intermediate_file_name)
     output_f = open(file_name,'w')
