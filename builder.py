@@ -750,12 +750,13 @@ def join_tuple_events(unmerged_file_name, act_count):
                 cont = True
                 break
             else:
-                ready_tuple[i+1] = join_data[id_t]['current_event']['values'][i]
+                ready_tuple[i+2] = join_data[id_t]['current_event']['values'][i]
 
         if cont:
             continue
 
         ready_tuple[0] = ts_t
+        ready_tuple[1] = id_t
         tuple_event = tuple(ready_tuple.values())
         merged_file.write(str(tuple_event)[1:] + '\n')
 
