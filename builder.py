@@ -41,8 +41,8 @@ Options:
  --arrivals <num>       sepcify how many arrivals per tuple will be generated
                         by default poisson distribution is used
 
- --poissparameter <num> poisson parameter to use when generating arrival events.
-                        The parameter specifies average arrival events per time
+ --poissparameter       poisson parameter to use when generating arrival events.
+  <num>                 The parameter specifies average arrival events per time
                         interval (defaut is a random number between 1 and 10)
 
  --poissarray <string>  specify a string containg poisson parameters separated
@@ -55,8 +55,8 @@ Options:
  --leavereport          leave a report file describing the parameters used to
                         create the testcase(s)
 
- --leavesettings <file> leave a report similar to that generated with
-                        leavereport but adjusted to the Dynasty Algorithm input.
+ --leavesettings        leave a report similar to that generated with
+   <file>               leavereport but adjusted to the Dynasty Algorithm input.
                         The report will be appended to the file specified.
 
  --expirations          specify when a value expires for each dimention. This
@@ -67,6 +67,13 @@ Options:
                         example: --expirations 5%2%10 for 3 dimentions.
 
  --resume  <file>       resume execution from specified tmp file
+
+ --events_per_line      in some cases it is better to have many events per line
+   <num>                rather then just one. That way many events can be written
+                        to memory per each disk reading. To adjust to just one event
+                        per line set this to 1. By default 5000 events per line
+                        are used.
+
 
  --dontdelete           keep kossmann tmp file (default is delete the file)
 
@@ -84,14 +91,8 @@ Options:
   --distributearr       data distribution refers to arrivals (default)
   --distributedim       data distribution refers to dimentions
 
-  --events_per_line     in some cases it is better to have many events per line
-                        rather then just one. That way many events can be written
-                        to memory per each disk reading. To adjust to just one event
-                        per line set this to 1. By default 5000 events per line
-                        are used.
-
---independentdims      if specified dimentions will have actualizations indepently,
-                       by default all dimentions arrive in a single event.
+ --independentdims      if specified dimentions will have actualizations indepently,
+                        by default all dimentions arrive in a single event.
 '''
 def get_path(filename):
     return dirname(abspath(__file__)) + '/' + filename
