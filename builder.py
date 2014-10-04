@@ -709,6 +709,13 @@ def sort_file(intermediate_file_name):
 
     return sorted_intermediate_file_name
 
+
+def init_join_data(join_data):
+    for id in range(0,G_SIZE):
+        join_data[id] = {
+            'current_event' : {'ts' : None, 'values' : dims_init()}
+        }
+
 def dims_init():
     dims = {}
     for i in range(0,G_DIMENTIONS):
@@ -716,50 +723,47 @@ def dims_init():
     return dims
 
 
-def join_tuple_events(unmerged_file_name):
+def join_tuple_events(unmerged_file_name, act_count):
     print_verbose_message('Joining tuples into single events...\n')
     merged_file_name = get_kossman_filename() + '_merged'
     merged_file = open(merged_file_name,'w')
+    unmerged_file = open(unmerged_file_name)
     perc_acum = 0
-    perc_total = G_SIZE
+    perc_total = act_count
     perc = 0
-    for id in range(0,G_SIZE):
+    join_data = {}
+    init_join_data(join_data)
+
+    for tupl_str in unmerged_file:
         perc = (perc_acum * 100.0) / perc_total
         print_verbose_message('\r{0}%'.format(perc))
-        unmerged_file = open(unmerged_file_name)
-        ready_set = []
+
+        tupl = eval('(' + tupl_str)
+        ts_t, id_t, dim_t, val_t = tupl
+
+        join_data[id_t]['current_event']['values'][dim_t] = val_t
+
         ready_tuple = {}
-        current_event = {'ts' : None, 'values' : dims_init()}
-        for tupl_str in unmerged_file:
-            tupl = eval('(' + tupl_str)
-            ts_t, id_t, dim_t, val_t = tupl
+        cont = False
+        for i in range(0,G_DIMENTIONS):
+            if join_data[id_t]['current_event']['values'][i] == None:
+                cont = True
+                break
+            else:
+                ready_tuple[i+1] = join_data[id_t]['current_event']['values'][i]
 
-            if id != id_t:
-                continue
+        if cont:
+            continue
 
-            current_event['values'][dim_t] = val_t
+        ready_tuple[0] = ts_t
+        tuple_event = tuple(ready_tuple.values())
+        merged_file.write(str(tuple_event)[1:] + '\n')
 
-            cont = False
-            for i in range(0,G_DIMENTIONS):
-                if current_event['values'][i] == None:
-                    cont = True
-                    break
-                else:
-                    ready_tuple[i+1] = current_event['values'][i]
+        join_data[id_t]['current_event'] = {'ts' : None, 'values' : dims_init()}
 
-            if cont:
-                continue
 
-            ready_tuple[0] = ts_t
-            ready_set.append(tuple(ready_tuple.values()))
-            ready_tuple = {}
-            current_event = {'ts' : None, 'values' : dims_init()}
-
-        for tuple_event in ready_set:
-            merged_file.write(str(tuple_event)[1:] + '\n')
-
-        unmerged_file.close()
-        perc_acum += 1
+    unmerged_file.close()
+    perc_acum += 1
 
     merged_file.close()
     sorted_merged_file_name = sort_file(merged_file_name)
@@ -781,7 +785,7 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
 
     if not G_INDEPENDENT_DIMS:
         sorted_intermediate_file_name = \
-        join_tuple_events(sorted_intermediate_file_name)
+        join_tuple_events(sorted_intermediate_file_name,act_count)
 
     input_f = open(sorted_intermediate_file_name)
     output_f = open(file_name,'w')
