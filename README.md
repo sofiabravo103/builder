@@ -72,8 +72,8 @@ builder  -o <outputfile> --autotiny
 ```correlated```           | use correlated data distribution
 ```uniform```              | use uniform data distribution (default)
 ```distributearr```        | data distribution refers to arrivals (default)
-```distributedim```        | data distribution refers to dimentions 
-```events_per_line```      | in some cases it is better to have many events per line to memory per each disk reading. To adjust to just one event per line set this to 1. By default 5000 events per line are used.
+```distributedim```        | data distribution refers to dimentions
+```events_per_line```      | in some cases it is better to have many events per line rather then just one. That way many events can be written to memory per each disk reading. To adjust to just one event per line set this to 1. By default 5000 events per line are used.
 ```independentdims```      | if specified dimentions will have actualizations indepently, by default all dimentions arrive in a single event.
 
 
