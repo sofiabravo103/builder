@@ -238,6 +238,9 @@ def check_auto(options):
         if '--events_per_line' in opt_list:
             counter = counter - 1
 
+        if '--independentdims' in opt_list:
+            counter = counter - 1
+
         if '--testcases' in opt_list:
             counter = counter - 1
 
