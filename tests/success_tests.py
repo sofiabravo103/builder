@@ -16,7 +16,7 @@ class TestBuilder(unittest.TestCase):
     arrivals = 1
     tuples = 10000
     self.call_builder(['-s', str(tuples) ,'-d','3','--arrivals', arrivals, \
-      '-o', test_name,'--events_per_line','1'])
+      '-o', test_name,'--events_per_line','1','--independentdims'])
     ids_dim_count = {}
     for id in range(0,tuples):
       ids_dim_count[id] = [0, 0, 0]
@@ -42,7 +42,7 @@ class TestBuilder(unittest.TestCase):
     tuples = 10000
     self.call_builder(['-s', str(tuples) ,'-d','3','--poissparameter', \
       str(poissparameter), '-o', test_name, '--time', '650', \
-      '--interval', '650', '--events_per_line', '1'])
+      '--interval', '650', '--events_per_line', '1','--independentdims'])
     ids_dim_count = {}
     for id in range(0,tuples):
       ids_dim_count[id] = [0, 0, 0]
@@ -69,7 +69,8 @@ class TestBuilder(unittest.TestCase):
     '''it should parse file completly with different events per line'''
     test_name = 'test_parse_ok'
 
-    self.call_builder(['--autodataset','-o', test_name,'--events_per_line','1'])
+    self.call_builder(['--autodataset','-o', test_name,\
+      '--events_per_line','1','--independentdims'])
     test_file = open(test_name)
     for tupl_str in test_file:
       tupl = eval(tupl_str)
@@ -83,7 +84,8 @@ class TestBuilder(unittest.TestCase):
       self.assertIsNotNone(val)
     os.system('rm ' + test_name)
 
-    self.call_builder(['--autodataset','-o', test_name, '--events_per_line','5000'])
+    self.call_builder(['--autodataset','-o', test_name,\
+     '--events_per_line','5000','--independentdims'])
     test_file = open(test_name)
     for tupl_str in test_file:
       tupl = eval(tupl_str)
