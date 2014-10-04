@@ -83,7 +83,7 @@ class TestBuilder(unittest.TestCase):
       self.assertIsNotNone(val)
     os.system('rm ' + test_name)
 
-    self.call_builder(['--autodataset','-o', test_name, '--events_per_line','1'])
+    self.call_builder(['--autodataset','-o', test_name, '--events_per_line','5000'])
     test_file = open(test_name)
     for tupl_str in test_file:
       tupl = eval(tupl_str)
