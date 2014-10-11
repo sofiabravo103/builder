@@ -74,6 +74,10 @@ Options:
                         per line set this to 1. By default 5000 events per line
                         are used.
 
+ --staticdims  <num>    change static amount of dimentions. By default the same number
+                        from the dynamic dataset is used.
+
+ --staticdata           generate a static dataset too.
 
  --dontdelete           keep kossmann tmp file (default is delete the file)
 
@@ -94,8 +98,12 @@ Options:
  --independentdims      if specified dimentions will have actualizations indepently,
                         by default all dimentions arrive in a single event.
 '''
-def get_path(filename):
-    return dirname(abspath(__file__)) + '/' + filename
+
+def get_path(filename=None):
+    if filename:
+        return dirname(abspath(__file__)) + '/' + filename
+    else:
+        return abspath('.')
 
 
 def print_verbose_message(msg):
@@ -116,6 +124,8 @@ def get_options(argv):
                      'distributedim', \
                      'dontdelete',\
                      'independentdims',\
+                     'staticdata',\
+                     'staticdims=',\
                      'poissarray=',\
                      'poissparameter=',\
                      'arrivals=',\
@@ -125,7 +135,8 @@ def get_options(argv):
                      'expirations=',\
                      'interval=',
                      'time=',\
-                     'events_per_line=']
+                     'events_per_line='
+                     ]
 
     try:
         options, args = getopt.getopt(argv,"o:s:d:v",long_options)
@@ -170,7 +181,7 @@ def check_outputfile(arg):
 
 def check_file_existence(arg, name, path_included=False):
     if arg[0] == '.':
-            print('WARNING: Non absolute paths are not supported. Check that settings '+\
+            print('Warning: Non absolute paths are not supported. Check that settings '+\
                 'file was created in the correct location.')
     if not path_included:
         if not os.path.isfile(get_path(arg)):
@@ -244,6 +255,9 @@ def check_auto(options):
         if '--testcases' in opt_list:
             counter = counter - 1
 
+        if '--staticdata' in opt_list:
+            counter = counter - 1
+
         if '--leavereport' in opt_list:
             counter = counter - 1
 
@@ -311,6 +325,8 @@ def check_options(options):
         elif opt == '--interval':
             check_num_parameter(arg,'interval',opt)
             check_interval(arg, options)
+        elif opt == '--staticdims':
+            check_num_parameter(arg,'static dimentions',opt)
         elif opt == '--events_per_line':
             check_num_parameter(arg,'events per line',opt)
         elif opt == '--arrrivals':
@@ -340,10 +356,15 @@ def set_defaults():
     global G_LEAVE_SETTINGS
     global G_INTERVAL
     global G_INDEPENDENT_DIMS
+    global G_STATICDATA
+    global G_STATICDIMS
     global MAX_ACTUALIZATIONS_LIST_SIZE
+
 
     MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 
+    G_STATICDATA = False
+    G_STATICDIMS = None
     G_INDEPENDENT_DIMS = False
     G_LEAVE_SETTINGS  = None
     G_SETTINGS_FILE = None
@@ -355,8 +376,8 @@ def set_defaults():
     G_DATA_DIST_APPLICATION = 'arrivals'
     G_DATA_DIST = 'E'
     G_POISS_PARAMETER = random.randint(2,5)
-    G_INTERVAL = 300
     G_SIMULATION_TIME = random.randint(100,600)
+    G_INTERVAL = G_SIMULATION_TIME
     G_ARRIVALS = None
     G_TESTCASES = 1
     G_AUTO = False
@@ -384,15 +405,24 @@ def parse_probability_options(options):
         elif opt == '--interval':
             G_INTERVAL = int(arg)
 
+def dynamic_data_dist_warning():
+    ans = raw_input("Warning: Dynamic dataset can only be generated"+\
+        " using an uniform distribution, do you wish to coninue? [Y/n]")
+    while not (ans == 'y' or ans == 'n' or ans == ''):
+        ans = raw_input("Please type 'y' or 'n': ")
+        if ans == 'n':
+            sys.exit()
+
+
 def parse_datadist_options(options):
     global G_DATA_DIST
 
     for opt, arg in options:
       if opt == '--anticorrelated':
-          raise NotImplementedError
+          dynamic_data_dist_warning()
           G_DATA_DIST = 'A'
       elif opt == '--correlated':
-          raise NotImplementedError
+          dynamic_data_dist_warning()
           G_DATA_DIST = 'C'
       elif opt == '--distributedim':
           raise NotImplementedError
@@ -462,9 +492,17 @@ def set_expirations_default():
         for x in range(0,G_DIMENTIONS)]
 
 
+def set_outputfile(name):
+    global G_OUTPUTFILE
+    if '/' in name:
+        path = abspath('/'.join(name.split('/')[:-1]))
+        G_OUTPUTFILE = path + '/' + name.split('/')[-1]
+    else:
+        G_OUTPUTFILE = str(get_path() + '/' + name)
+
+
 def parse_input(options):
     global G_VERBOSE
-    global G_OUTPUTFILE
     global G_TESTCASES
     global G_LEAVE_REPORT
     global G_SETTINGS_FILE
@@ -472,6 +510,8 @@ def parse_input(options):
     global G_DELETE_TMP
     global G_SIMULATION_TIME
     global G_INDEPENDENT_DIMS
+    global G_STATICDATA
+    global G_STATICDIMS
     global MAX_ACTUALIZATIONS_LIST_SIZE
 
     set_defaults()
@@ -480,9 +520,14 @@ def parse_input(options):
         if opt == '-v':
             G_VERBOSE = True
         elif opt == '-o':
-            G_OUTPUTFILE = arg
+            set_outputfile(arg)
         elif opt == '--testcases':
             G_TESTCASES = int(arg)
+        elif opt == '--staticdata':
+            G_STATICDATA = True
+        elif opt == '--staticdims':
+            G_STATICDIMS = int(arg)
+            G_STATICDATA = True
         elif opt == '--leavereport':
             G_LEAVE_REPORT = True
         elif opt == '--leavesettings':
@@ -508,6 +553,37 @@ def parse_input(options):
 
     set_expirations_default()
 
+def report_static_settings(of_settings):
+    of_settings.write('\n# Static metadata (auto-generated by builder)\n')
+
+    for variable in globals():
+        if 'G_' in variable:
+            r_value = str(variable[2:])
+            l_value = str(eval(variable))
+
+            if r_value == 'STATICDATA':
+                r_value = 'INPUTFILE'
+                l_value = "'{0}_static'".format(G_OUTPUTFILE)
+
+            elif r_value == 'STATICDIMS':
+                r_value = 'DIMENTIONS'
+                l_value = str(G_DIMENTIONS)
+
+            elif r_value == 'SIZE':
+                r_value = 'TUPLES'
+
+            elif r_value == 'OUTPUTFILE':
+                l_value = (str(eval(variable)) +"_stat_output").split('/')[-1]
+            else:
+                continue
+
+            line = r_value + '\t=\t' + l_value
+            of_settings.write('S_' + line + '\n')
+
+    of_settings.write('S_VERBOSE\t=\t False\n')
+    of_settings.write('S_DIRECTIVES_VALUE\t=\t MAX\n')
+
+
 def report_settings():
     if G_SETTINGS_FILE is not None:
         of_settings = open(G_SETTINGS_FILE,'a')
@@ -516,8 +592,10 @@ def report_settings():
                    'TESTCASES','POISS_ARRAY', 'VERBOSE','RESUME','ARRIVALS',\
                    'SETTINGS_FILE', 'DATA_DIST_APPLICATION','DATA_DIST',
                    'LEAVE_SETTINGS','POISS_PARAMETER','TINY','DELETE_TMP',
-                   'LEAVE_REPORT','AUTO']
+                   'LEAVE_REPORT','AUTO','STATICDATA','STATICDIMS',\
+                   'INDEPENDENT_DIMS','INTERVAL']
 
+        of_settings.write('# Dynamic metadata (auto-generated by builder)\n')
         for variable in globals():
             if 'G_' in variable:
                 r_value = str(variable[2:])
@@ -533,15 +611,20 @@ def report_settings():
                     r_value = 'EXPIRATION_TIMES'
 
                 if r_value == 'OUTPUTFILE':
-                    l_value = "'"+ str(eval(variable)) +"_output'"
-                    path = str(abspath('.'))
-                    of_settings.write('D_INPUTFILE = "'+ path + '/' + \
-                                      str(eval(variable)) + '"\n')
+                    l_value = (str(eval(variable)) +"_dyn_output").split('/')[-1]
+                    of_settings.write("D_INPUTFILE\t=\t'"+ \
+                                      str(eval(variable)) + "_dyn'\n")
 
                 if r_value == 'SIMULATION_TIME':
                     r_value = 'SIMULATION_SECONDS'
                 line = r_value + '\t=\t' + l_value
                 of_settings.write('D_' + line + '\n')
+
+        of_settings.write('D_VERBOSE\t=\t False\n')
+        of_settings.write('D_DIRECTIVES_VALUE\t=\t MAX\n')
+
+        if G_STATICDATA:
+            report_static_settings(of_settings)
 
         of_settings.close()
 
@@ -550,7 +633,7 @@ def report_input():
         of_report = open('{0}_report'.format(get_path(G_OUTPUTFILE)),'w')
 
     if G_VERBOSE or G_LEAVE_REPORT:
-        print 'Generating dataset according to:'
+        print '\nGenerating dataset according to:'
         for variable in globals():
             if'G_' in variable:
                 value = eval(variable)
@@ -560,6 +643,7 @@ def report_input():
 
                 if G_VERBOSE:
                     print line
+        print '\n'
 
 def get_kossman_filename():
     if G_RESUME is not None:
@@ -593,7 +677,8 @@ def call_kossman():
         if dimentions <= 1:
             dimentions = 2
 
-        print_verbose_message('Creating tmp file with Kossmann generator...')
+        print_verbose_message('Creating tmp file with Kossmann generator '+\
+            'for dynamic dataset...')
         os.system('{0} {1} {2} {3} {4} > /dev/null'.format(\
             get_path('generator'), dimentions, G_DATA_DIST,size,
             get_path('tmp_{0}_notail'.format(TIME))))
@@ -777,9 +862,9 @@ def join_tuple_events(unmerged_file_name, act_count):
 
 def write_outputfile(intermediate_file_name, testcase_num, act_count):
     if testcase_num != None:
-        file_name = G_OUTPUTFILE + '_' + str(testcase_num)
+        file_name = G_OUTPUTFILE +'_dyn' + '_' + str(testcase_num)
     else:
-        file_name = G_OUTPUTFILE
+        file_name = G_OUTPUTFILE +'_dyn'
 
     print_verbose_message('Sorting dataset...')
     sorted_intermediate_file_name = sort_file(intermediate_file_name)
@@ -889,6 +974,23 @@ def generate_datasets(arrival_arr):
     if G_DELETE_TMP:
             os.system('rm {0}'.format(get_kossman_filename()))
 
+def generate_static_dataset():
+    if not os.path.isfile(get_path(GENERATOR)):
+        raise Exception('Error: kossman generator does exist')
+
+    if not os.path.isfile(get_path('generador')):
+        os.system('g++ {0} -o {1}'.format(get_path(GENERATOR),get_path('generator')))
+
+    if G_STATICDIMS:
+        dimentions = G_STATICDIMS
+    else:
+        dimentions = G_DIMENTIONS
+
+    print_verbose_message('Creating static file with Kossmann generator...')
+    os.system('{0} {1} {2} {3} {4} > /dev/null'.format(\
+        get_path('generator'), dimentions, G_DATA_DIST,G_SIZE,
+        '{0}_static'.format(G_OUTPUTFILE)))
+    print_verbose_message(' done.\n')
 
 def main(argv):
     options = get_options(argv)
@@ -903,6 +1005,9 @@ def main(argv):
     if G_VERBOSE or G_LEAVE_REPORT or G_LEAVE_SETTINGS:
         report_input()
         report_settings()
+
+    if G_STATICDATA:
+        generate_static_dataset()
 
     call_kossman()
 
