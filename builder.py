@@ -573,7 +573,7 @@ def report_static_settings(of_settings):
                 r_value = 'TUPLES'
 
             elif r_value == 'OUTPUTFILE':
-                l_value = (str(eval(variable)) +"_stat_output").split('/')[-1]
+                l_value = "'" + (str(eval(variable)) +"_stat_output'").split('/')[-1]
             else:
                 continue
 
@@ -581,7 +581,7 @@ def report_static_settings(of_settings):
             of_settings.write('S_' + line + '\n')
 
     of_settings.write('S_VERBOSE\t=\t False\n')
-    of_settings.write('S_DIRECTIVES_VALUE\t=\t MAX\n')
+    of_settings.write("S_DIRECTIVES_VALUE\t=\t 'MAX'\n")
 
 
 def report_settings():
@@ -611,7 +611,7 @@ def report_settings():
                     r_value = 'EXPIRATION_TIMES'
 
                 if r_value == 'OUTPUTFILE':
-                    l_value = (str(eval(variable)) +"_dyn_output").split('/')[-1]
+                    l_value = "'"+(str(eval(variable)) +"_dyn_output'").split('/')[-1]
                     of_settings.write("D_INPUTFILE\t=\t'"+ \
                                       str(eval(variable)) + "_dyn'\n")
 
@@ -621,7 +621,7 @@ def report_settings():
                 of_settings.write('D_' + line + '\n')
 
         of_settings.write('D_VERBOSE\t=\t False\n')
-        of_settings.write('D_DIRECTIVES_VALUE\t=\t MAX\n')
+        of_settings.write("D_DIRECTIVES_VALUE\t=\t 'MAX'\n")
 
         if G_STATICDATA:
             report_static_settings(of_settings)
