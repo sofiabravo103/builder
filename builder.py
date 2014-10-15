@@ -10,6 +10,7 @@ import numpy
 import math
 import linecache
 import resource
+import copy
 from kosmann_splitter import KosmannSplitter
 from os.path import dirname, abspath
 
@@ -17,6 +18,8 @@ TIME = time.time()
 GENERATOR = 'generador.cpp'
 MAX_KOSSMAN_DATA_LIST_SIZE = 1000
 MAX_INTERMEDIATE_FILE_SIZE_GB = 5
+EXPIRATION_EVENT = 0
+UPDATE_EVENT = 1
 
 # Dataset will be generated with CONS_DATASET
 # times the number of rows of the testcase
@@ -59,12 +62,13 @@ Options:
    <file>               leavereport but adjusted to the Dynasty Algorithm input.
                         The report will be appended to the file specified.
 
- --expirations          specify when a value expires for each dimention. This
-                        value will not affect testcases generation, but will be
-                        used for report and written to settings if
-                        --leavesettings option is indicated. Input is a string
-                        containg expiration values separated with an '%'.
-                        example: --expirations 5%2%10 for 3 dimentions.
+ --expiration <num>     specify how much of the ttl (time to live) of each
+                        tuple is accepted before an expiration event ocurs.
+                        Time to live is generated according to the poisson
+                        parameter and the interval value selected.
+                        example: expirations = 1.5 means that a tuple will expire
+                        in (poisson_interval / poisson_paramater) * 1.5.
+                        Default value is 1.5.
 
  --resume  <file>       resume execution from specified tmp file
 
@@ -132,7 +136,7 @@ def get_options(argv):
                      'testcases=',\
                      'leavesettings=', \
                      'resume=',\
-                     'expirations=',\
+                     'expiration=',\
                      'interval=',
                      'time=',\
                      'events_per_line='
@@ -226,15 +230,18 @@ def check_poiss_array(arg,options):
         raise Exception('Error: --poissparameter and --poissarray cannot be '+\
                             'seleceted together')
 
-def check_expirations_array(arg,options):
-    exp_array = arg.split('%')
-    dimentions = int([y for x,y in options if x == '-d'][0])
-    if len(exp_array) != dimentions:
-        raise Exception('Error: --expirations has bad format (is the number'+\
-                        'of values in the array equal to the number of '+\
-                        'dimentions?)')
-    for num in exp_array:
-        check_num_parameter(num,'expirations','--expirations')
+def check_expiration(arg,name,option):
+    if '-' in arg:
+        raise Exception('Error: '+ name +' parameter(s) must be a positive '+\
+                            'real number')
+    try:
+        f = int(arg)
+    except ValueError:
+        raise Exception('Error: '+ name +' parameter('+ option \
+                        +') is not a number.')
+    if f == 0:
+        raise Exception('Error: '+ name +' parameter ('+ option \
+                        +') must be greater than zero.')
 
 
 def check_auto(options):
@@ -305,9 +312,9 @@ def check_options(options):
         elif opt == '-d':
             check_dimentions(arg)
         elif opt == '-o':
-            check_outputfile(arg)
-        elif opt == '--expirations':
-            check_expirations_array(arg,options)
+            check_outputfile(arg + '_dyn')
+        elif opt == '--expiration':
+            check_expiration(arg, 'expiration', opt)
         elif opt == '--leavesettings':
             check_file_existence(arg, 'settings', path_included=True)
         elif opt == '--time':
@@ -358,6 +365,7 @@ def set_defaults():
     global G_INDEPENDENT_DIMS
     global G_STATICDATA
     global G_STATICDIMS
+    global G_EXPIRATION
     global MAX_ACTUALIZATIONS_LIST_SIZE
 
 
@@ -382,7 +390,7 @@ def set_defaults():
     G_TESTCASES = 1
     G_AUTO = False
     G_TINY = False
-    G_EXPIRATIONS = []
+    G_EXPIRATION = 1.5
 
 def parse_probability_options(options):
     global G_POISS_PARAMETER
@@ -392,6 +400,7 @@ def parse_probability_options(options):
 
     for opt, arg in options:
         if opt == '--arrivals':
+            raise NotImplementedError('arrivals option is not implemented.')
             G_ARRIVALS = int(arg)
             G_POISS_PARAMETER = None
 
@@ -399,19 +408,12 @@ def parse_probability_options(options):
             G_POISS_PARAMETER = int(arg)
 
         elif opt == '--poissarray':
+            raise NotImplementedError('poissarray option is not implemented.')
             G_POISS_PARAMETER = None
             G_POISS_ARRAY = [int(x) for x in arg.split('%')]
 
         elif opt == '--interval':
             G_INTERVAL = int(arg)
-
-def dynamic_data_dist_warning():
-    ans = raw_input("Warning: Dynamic dataset can only be generated"+\
-        " using an uniform distribution, do you wish to coninue? [Y/n]")
-    while not (ans == 'y' or ans == 'n' or ans == ''):
-        ans = raw_input("Please type 'y' or 'n': ")
-        if ans == 'n':
-            sys.exit()
 
 
 def parse_datadist_options(options):
@@ -419,13 +421,11 @@ def parse_datadist_options(options):
 
     for opt, arg in options:
       if opt == '--anticorrelated':
-          dynamic_data_dist_warning()
           G_DATA_DIST = 'A'
       elif opt == '--correlated':
-          dynamic_data_dist_warning()
           G_DATA_DIST = 'C'
       elif opt == '--distributedim':
-          raise NotImplementedError
+          raise NotImplementedError('distributedim option is not implemented.')
           global G_DATA_DIST_APPLICATION
           G_DATA_DIST_APPLICATION = 'dimentions'
 
@@ -466,7 +466,7 @@ def set_autodataset_values():
 
     G_DIMENTIONS = random.randint(3,max_dim)
     G_SIZE = random.randint(min_size,max_size)
-    G_ARRIVALS = (random.randint(min_arr,max_arr) * G_SIMULATION_TIME) / G_INTERVAL
+    G_POISS_PARAMETER = (random.randint(min_arr,max_arr))
 
 def parse_auto(options):
     global G_AUTO
@@ -483,14 +483,6 @@ def parse_auto(options):
             G_TINY = True
             set_autodataset_values()
     return G_AUTO
-
-def set_expirations_default():
-    global G_EXPIRATIONS
-    if G_EXPIRATIONS == []:
-        G_EXPIRATIONS = [random.randint(int(G_SIMULATION_TIME * 0.2)\
-            ,int(G_SIMULATION_TIME * 0.6))\
-        for x in range(0,G_DIMENTIONS)]
-
 
 def set_outputfile(name):
     global G_OUTPUTFILE
@@ -512,6 +504,7 @@ def parse_input(options):
     global G_INDEPENDENT_DIMS
     global G_STATICDATA
     global G_STATICDIMS
+    global G_EXPIRATION
     global MAX_ACTUALIZATIONS_LIST_SIZE
 
     set_defaults()
@@ -522,6 +515,7 @@ def parse_input(options):
         elif opt == '-o':
             set_outputfile(arg)
         elif opt == '--testcases':
+            raise NotImplementedError('testcases option is not implemented.')
             G_TESTCASES = int(arg)
         elif opt == '--staticdata':
             G_STATICDATA = True
@@ -534,7 +528,7 @@ def parse_input(options):
             G_SETTINGS_FILE = arg
             G_LEAVE_SETTINGS = True
         elif opt == '--expirations':
-            G_EXPIRATIONS = [int(x) for x in arg.split('%')]
+            G_EXPIRATION = int(arg)
         elif opt == '--events_per_line':
             MAX_ACTUALIZATIONS_LIST_SIZE = int(arg)
         elif opt == '--resume':
@@ -544,14 +538,13 @@ def parse_input(options):
         elif opt == '--time':
             G_SIMULATION_TIME = float(arg)
         elif opt == '--independentdims':
+            raise NotImplementedError('independentdims option is not implemented.')
             G_INDEPENDENT_DIMS = True
 
     if not parse_auto(options):
         parse_short_options(options)
         parse_datadist_options(options)
         parse_probability_options(options)
-
-    set_expirations_default()
 
 def report_static_settings(of_settings):
     of_settings.write('\n# Static metadata (auto-generated by builder)\n')
@@ -593,7 +586,7 @@ def report_settings():
                    'SETTINGS_FILE', 'DATA_DIST_APPLICATION','DATA_DIST',
                    'LEAVE_SETTINGS','POISS_PARAMETER','TINY','DELETE_TMP',
                    'LEAVE_REPORT','AUTO','STATICDATA','STATICDIMS',\
-                   'INDEPENDENT_DIMS','INTERVAL']
+                   'INDEPENDENT_DIMS','INTERVAL','EXPIRATION']
 
         of_settings.write('# Dynamic metadata (auto-generated by builder)\n')
         for variable in globals():
@@ -606,9 +599,6 @@ def report_settings():
 
                 if r_value == 'SIZE':
                     r_value = 'TUPLES'
-
-                if r_value == 'EXPIRATIONS':
-                    r_value = 'EXPIRATION_TIMES'
 
                 if r_value == 'OUTPUTFILE':
                     l_value = "'"+(str(eval(variable)) +"_dyn_output'").split('/')[-1]
@@ -657,6 +647,16 @@ def randomize_file():
     os.system('sort -R {0} -o {1}'.format(file_name, file_name))
     print_verbose_message(' done.\n')
 
+
+def dynamic_data_dist_warning():
+    ans = raw_input("Warning: Dynamic dataset for specified data "+\
+        "is too big and can only be generated"+\
+        " using an uniform distribution, do you wish to coninue? [Y/n]")
+    while not (ans == 'y' or ans == 'n' or ans == ''):
+        ans = raw_input("Please type 'y' or 'n': ")
+        if ans == 'n':
+            sys.exit()
+
 def call_kossman():
     if G_RESUME is not None:
         return
@@ -677,10 +677,15 @@ def call_kossman():
         if dimentions <= 1:
             dimentions = 2
 
+        if G_DATA_DIST != 'E' and dimentions >= 75:
+            dynamic_data_dist_warning()
+            distribution = 'E'
+        else:
+            distribution = G_DATA_DIST
         print_verbose_message('Creating tmp file with Kossmann generator '+\
             'for dynamic dataset...')
         os.system('{0} {1} {2} {3} {4} > /dev/null'.format(\
-            get_path('generator'), dimentions, G_DATA_DIST,size,
+            get_path('generator'), dimentions, distribution,size,
             get_path('tmp_{0}_notail'.format(TIME))))
         os.system('tail -n +2 {0} > {1}'.format(\
             get_path('tmp_{0}_notail'.format(TIME)),\
@@ -799,10 +804,11 @@ def sort_file(intermediate_file_name):
     return sorted_intermediate_file_name
 
 
-def init_join_data(join_data):
+def init_single_data(single_data):
     for id in range(0,G_SIZE):
-        join_data[id] = {
-            'current_event' : {'ts' : None, 'values' : dims_init()}
+        single_data[id] = {
+            'current_event' : {'ts' : None, 'values' : dims_init()},
+            'current_expiration' : None
         }
 
 def dims_init():
@@ -811,8 +817,54 @@ def dims_init():
         dims[i] = None
     return dims
 
+def tuples_ttl():
+    if G_POISS_PARAMETER == None:
+        raise NotImplementedError()
+    else:
+        return (G_INTERVAL / G_POISS_PARAMETER) * G_EXPIRATION
 
-def join_tuple_events(unmerged_file_name, act_count):
+def update_expirations(ttl, ts_t, id_t, join_data, merged_file):
+    old_exp = join_data[id_t]['current_expiration']
+    if old_exp != None and (ts_t - old_exp) >= ttl:
+        if old_exp < G_SIMULATION_TIME:
+            exp_event = (old_exp, EXPIRATION_EVENT, id_t)
+            merged_file.write(str(exp_event)[1:] + '\n')
+
+    join_data[id_t]['current_expiration'] = ts_t + ttl
+
+def write_final_expirations(ttl, join_data, o_file):
+    for id_t in range(0, G_SIZE):
+        exp = join_data[id_t]['current_expiration']
+        if exp != None and exp <= G_SIMULATION_TIME:
+            exp_event = (exp, EXPIRATION_EVENT, id_t)
+            o_file.write(str(exp_event)[1:] + '\n')
+
+def create_static_dict():
+    static_file = open(G_OUTPUTFILE + '_static')
+    static_file.readline() #ignore first line
+    id_t = 0
+    static_dict = {}
+    for line in static_file:
+        tmp = line.split()
+        static_dict[id_t] = {}
+        for dim_t in range(0, G_DIMENTIONS):
+            static_dict[id_t][dim_t] = float(tmp[dim_t])
+        id_t += 1
+
+    return static_dict
+
+def insert_static_dims_to_update_event(ready_tuple, static_dict):
+    id_t = ready_tuple[2]
+    joined_ready_tuple = copy.copy(ready_tuple)
+    for dim_t in range(0, G_DIMENTIONS):
+        joined_ready_tuple[G_DIMENTIONS + 3 + dim_t] = static_dict[id_t][dim_t]
+    return joined_ready_tuple
+
+
+def single_tuple_events(unmerged_file_name, act_count):
+    if G_STATICDATA:
+        joined_file_name = G_OUTPUTFILE + '_joined'
+        joined_file = open(joined_file_name, 'wb')
     print_verbose_message('Joining tuples into single events...\n')
     merged_file_name = get_kossman_filename() + '_merged'
     merged_file = open(merged_file_name,'w')
@@ -820,8 +872,11 @@ def join_tuple_events(unmerged_file_name, act_count):
     perc_acum = 0
     perc_total = act_count
     perc = 0
-    join_data = {}
-    init_join_data(join_data)
+    single_data = {}
+    init_single_data(single_data)
+    ttl = tuples_ttl()
+    if G_STATICDATA:
+        static_dict = create_static_dict()
 
     for tupl_str in unmerged_file:
         perc = (perc_acum * 100) / perc_total
@@ -830,54 +885,84 @@ def join_tuple_events(unmerged_file_name, act_count):
         tupl = eval('(' + tupl_str)
         ts_t, id_t, dim_t, val_t = tupl
 
-        join_data[id_t]['current_event']['values'][dim_t] = val_t
-
+        single_data[id_t]['current_event']['values'][dim_t] = val_t
         ready_tuple = {}
-        cont = False
+        arrivals_are_complete = True
         for i in range(0,G_DIMENTIONS):
-            if join_data[id_t]['current_event']['values'][i] == None:
-                cont = True
+            if single_data[id_t]['current_event']['values'][i] == None:
+                arrivals_are_complete = False
                 break
             else:
-                ready_tuple[i+2] = join_data[id_t]['current_event']['values'][i]
+                ready_tuple[i+3] = single_data[id_t]['current_event']['values'][i]
 
         perc_acum += 1
-        if cont:
+
+        if not arrivals_are_complete:
             continue
 
+        update_expirations(ttl, ts_t, id_t, single_data, merged_file)
+
         ready_tuple[0] = ts_t
-        ready_tuple[1] = id_t
+        ready_tuple[1] = UPDATE_EVENT
+        ready_tuple[2] = id_t
+        if G_STATICDATA:
+            joined_ready_tuple = insert_static_dims_to_update_event(\
+                ready_tuple, static_dict)
+            joined_tuple_event = tuple(joined_ready_tuple.values())
+            joined_file.write(str(joined_tuple_event)[1:] + '\n')
+
         tuple_event = tuple(ready_tuple.values())
         merged_file.write(str(tuple_event)[1:] + '\n')
 
-        join_data[id_t]['current_event'] = {'ts' : None, 'values' : dims_init()}
+        single_data[id_t]['current_event'] = {'ts' : None, 'values' : dims_init()}
 
     unmerged_file.close()
-
-
+    write_final_expirations(ttl, single_data, merged_file)
     merged_file.close()
+    if G_STATICDATA:
+        write_final_expirations(ttl, single_data, joined_file)
+        joined_file.close()
     print_verbose_message('\r done\n')
     os.system('rm {0}'.format(unmerged_file_name))
-    return merged_file_name
-
-def write_outputfile(intermediate_file_name, testcase_num, act_count):
-    if testcase_num != None:
-        file_name = G_OUTPUTFILE +'_dyn' + '_' + str(testcase_num)
+    print_verbose_message('Sorting dataset again for expiration events...\n')
+    sorted_merged_file_name = sort_file(merged_file_name)
+    if G_STATICDATA:
+        sorted_joined_file_name = sort_file(joined_file_name)
+        os.system('rm {0}'.format(joined_file_name))
+    print_verbose_message('\r done\n')
+    os.system('rm {0}'.format(merged_file_name))
+    if G_STATICDATA:
+        return (sorted_merged_file_name, sorted_joined_file_name)
     else:
-        file_name = G_OUTPUTFILE +'_dyn'
+        return sorted_merged_file_name
 
+def prepare_outputfile(intermediate_file_name, testcase_num, act_count):
     print_verbose_message('Sorting dataset...')
     sorted_intermediate_file_name = sort_file(intermediate_file_name)
     print_verbose_message(' done.\n')
 
     if not G_INDEPENDENT_DIMS:
-        sorted_intermediate_file_name = \
-        join_tuple_events(sorted_intermediate_file_name,act_count)
+        if G_STATICDATA:
+            result =\
+            single_tuple_events(sorted_intermediate_file_name,act_count)
+            sorted_intermediate_file_name  = result[0]
+            sorted_joined_file_name = result[1]
+            write_outputfile(sorted_joined_file_name, testcase_num, act_count, 'joined')
+            write_outputfile(sorted_intermediate_file_name, testcase_num, act_count, 'dyn')
+        else:
+            sorted_intermediate_file_name = \
+            join_tuple_events(sorted_intermediate_file_name,act_count)
+            write_outputfile(sorted_intermediate_file_name)
 
-    input_f = open(sorted_intermediate_file_name)
+
+def write_outputfile(o_file, testcase_num, act_count, name):
+
+    file_name = G_OUTPUTFILE + '_' + name
+
+    input_f = open(o_file)
     output_f = open(file_name,'w')
 
-    print_verbose_message('Writing output file...\n')
+    print_verbose_message('Writing output file {0}...\n'.format(name))
     line_counter = 0
     acum = 0
     of_line = ''
@@ -896,14 +981,14 @@ def write_outputfile(intermediate_file_name, testcase_num, act_count):
         p = (acum * 100) / act_count
         print_verbose_message('\r{0}%'.format(p))
         if end_of_file_reached:
-            output_f.write(of_line[:-2])
+            output_f.write(of_line[:-2] + '\n')
         else:
             output_f.write(of_line[:-2] + '\n')
         line_counter = 0
         of_line = ''
 
     output_f.close()
-    os.system('rm {0}'.format(sorted_intermediate_file_name))
+    os.system('rm {0}'.format(o_file))
     print_verbose_message('\r done.\n')
 
 def intermediate_file_writer(result,intermediate_file):
@@ -951,7 +1036,7 @@ def create_dataset(arrivals, splitter, testcase_num=None):
     print_verbose_message('\r done.\n')
     intermediate_file.close()
 
-    write_outputfile(intermediate_file_name, testcase_num, act_count)
+    prepare_outputfile(intermediate_file_name, testcase_num, act_count)
     os.system("rm {0}".format(intermediate_file_name))
 
 def generate_datasets(arrival_arr):
