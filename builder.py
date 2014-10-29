@@ -23,7 +23,7 @@ UPDATE_EVENT = 1
 
 # Dataset will be generated with CONS_DATASET
 # times the number of rows of the testcase
-CONS_DATASET = 2
+CONS_DATASET = 3
 
 help_text = '''Usage:
 builder [options] -o <outputfile> -s <size> -d <dimentions>
@@ -668,11 +668,7 @@ def call_kossman():
         os.system('g++ {0} -o {1}'.format(get_path(GENERATOR),get_path('generator')))
 
     if G_DATA_DIST_APPLICATION == 'arrivals':
-        if G_TESTCASES > 1:
-            size = G_SIZE * G_DIMENTIONS * CONS_DATASET
-        else:
-            size = G_DIMENTIONS * G_SIZE
-
+        size = G_SIZE * G_DIMENTIONS * CONS_DATASET
         dimentions = G_ARRIVALS
         if dimentions <= 1:
             dimentions = 2
