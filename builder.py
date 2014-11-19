@@ -1069,7 +1069,7 @@ def generate_static_dataset():
 
     print_verbose_message('Creating static file with Kossmann generator...')
     os.system('{0} {1} {2} {3} {4} > /dev/null'.format(\
-        get_path('generator'), dimentions, G_DATA_DIST,G_SIZE,
+        get_path('generator'), dimentions, 'E',G_SIZE,
         '{0}_static'.format(G_OUTPUTFILE)))
     print_verbose_message(' done.\n')
 
