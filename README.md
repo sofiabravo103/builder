@@ -52,7 +52,7 @@ builder  -o <outputfile> --autotiny
 
 ## Output
 
-The generator will create 3 output files using de prefix you specified
+The generator will create 3 output files using the prefix you specified
  with the `-o option`:
  * `PREFIX_dyn` : A file with dynamic event tuples
  * `PREFIX_static` : A file with raw kossmann static dimention data
