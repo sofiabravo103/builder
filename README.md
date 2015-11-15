@@ -92,7 +92,7 @@ The generator will create 3 output files using de prefix you specified
 ```uniform```              | use uniform data distribution (default)
 ```distributearr```        | data distribution refers to arrivals (default)
 ```distributedim```        | data distribution refers to dimentions
-```independentdims```      | if specified dimentions will have actualizations indepently, by default all dimentions arrive in a single event.
+```independentdims```      | if specified dimentions will have actualizations independently, by default all dimentions arrive in a single event.
 
 
 ## Contributors ##
