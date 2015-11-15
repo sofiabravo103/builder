@@ -99,7 +99,7 @@ Options:
   --distributearr       data distribution refers to arrivals (default)
   --distributedim       data distribution refers to dimentions
 
- --independentdims      if specified dimentions will have actualizations indepently,
+ --independentdims      if specified dimentions will have actualizations independently,
                         by default all dimentions arrive in a single event.
 '''
 
@@ -371,7 +371,7 @@ def set_defaults():
 
     MAX_ACTUALIZATIONS_LIST_SIZE = 5000
 
-    G_STATICDATA = False
+    G_STATICDATA = True
     G_STATICDIMS = None
     G_INDEPENDENT_DIMS = False
     G_LEAVE_SETTINGS  = None
@@ -444,6 +444,7 @@ def set_autodataset_values():
     global G_SIZE
     global G_ARRIVALS
     global G_POISS_PARAMETER
+    global G_STATICDIMS
     G_POISS_PARAMETER = None
 
     if G_TINY:
@@ -454,7 +455,6 @@ def set_autodataset_values():
 
         min_arr = 2
         max_arr = 2
-
     else:
         max_dim = 5
 
@@ -465,6 +465,7 @@ def set_autodataset_values():
         max_arr = 5
 
     G_DIMENTIONS = random.randint(3,max_dim)
+    G_STATICDIMS = random.randint(3,max_dim)
     G_SIZE = random.randint(min_size,max_size)
     G_POISS_PARAMETER = (random.randint(min_arr,max_arr))
 
@@ -946,10 +947,13 @@ def prepare_outputfile(intermediate_file_name, testcase_num, act_count):
             write_outputfile(sorted_joined_file_name, testcase_num, act_count, 'joined')
             write_outputfile(sorted_intermediate_file_name, testcase_num, act_count, 'dyn')
         else:
+            raise NotImplementedError('Generating only dynamic data'+\
+                ' is currently under development')
             sorted_intermediate_file_name = \
             join_tuple_events(sorted_intermediate_file_name,act_count)
             write_outputfile(sorted_intermediate_file_name)
-
+    else:
+        raise NotImplementedError('independentdims option is not yet implemented.')
 
 def write_outputfile(o_file, testcase_num, act_count, name):
 

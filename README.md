@@ -50,6 +50,24 @@ For getting a tiny dataset (ideal for test):
 builder  -o <outputfile> --autotiny
 ~~~~~
 
+## Output
+
+The generator will create 3 output files using de prefix you specified
+ with the `-o option`:
+ * `PREFIX_dyn` : A file with dynamic event tuples
+ * `PREFIX_static` : A file with raw kossmann static dimention data
+ * `PREFIX_joined` : A file with joined dynamic and static tuple events
+ (this is probably the one you want.)
+
+`PREFIX_dyn` and `PREFIX_joined` contain tuples with the generated elements
+ for the simulation which are, in order:
+
+ 1. A timestamp for when the event is produced
+ 2. The event type: 1 for updated value (or new arrival), 0 for expirations
+ 3. The id of the tuple on which the event is produced
+ 4. The values of the tuple (unless the event is an expiration, in which case
+  only timestamp, type and id will be given.)
+
 ### Specific options ###
 
 ```option```                 | Function
