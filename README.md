@@ -1,4 +1,4 @@
-# Builder: a dynamic data generator for skyline querys
+# Builder: a dynamic data generator for skyline queries
 
 Builder is currently implemented to run only in an **Unix-like** environment.
 
