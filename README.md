@@ -2,7 +2,7 @@
 
 Builder is currently implemented to run only in an **Unix-like** environment.
 
-Generator of dynamic data following the structure of a sensor net. For the relations between the data Kossman skyline generator was used.
+It is a generator of dynamic data following the structure of a sensor network. In order to create relationships between data points Builder uses Kossman skyline generator.
 
 ## Set up ##
 
@@ -35,17 +35,17 @@ Generator of dynamic data following the structure of a sensor net. For the relat
 
 ### General options ###
 
-For getting a specific dataset:
+To get a specific dataset:
 ~~~~~
 builder [options] -o <outputfile> -s <size> -d <dimentions>
 ~~~~~
 
-For getting a dataset randomly generated:
+To get a dataset randomly generated:
 ~~~~~
 builder  -o <outputfile> --autodataset
 ~~~~~
 
-For getting a tiny dataset (ideal for test):
+To get a tiny dataset (ideal for test):
 ~~~~~
 builder  -o <outputfile> --autotiny
 ~~~~~
